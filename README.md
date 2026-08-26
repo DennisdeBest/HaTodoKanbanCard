@@ -128,7 +128,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 49 assertions in jsdom
+npm test        # 48 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 ```
 
