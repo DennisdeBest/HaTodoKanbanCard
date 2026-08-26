@@ -40,7 +40,7 @@ support adding. Local To-do supports everything.
 ### HACS (custom repository)
 
 1. HACS → three dots, top right → **Custom repositories**
-2. URL `https://github.com/DennisdeBest/todo-kanban-card`, type **Dashboard**
+2. URL `https://github.com/DennisdeBest/HaTodoKanbanCard`, type **Dashboard**
 3. Install **Todo Kanban Card**, then reload the page.
 
 ### Manually

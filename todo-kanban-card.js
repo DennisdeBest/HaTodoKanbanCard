@@ -1,6 +1,6 @@
 /*
  * todo-kanban-card — a kanban board over Home Assistant `todo` entities.
- * https://github.com/DennisdeBest/todo-kanban-card
+ * https://github.com/DennisdeBest/HaTodoKanbanCard
  *
  * Home Assistant can show you a todo list. It cannot move an item from one list to
  * another: the core todo-list card has no such control, and there is no service for it

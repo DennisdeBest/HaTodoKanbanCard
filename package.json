@@ -12,13 +12,13 @@
   "devDependencies": {
     "jsdom": "^30.0.0"
   },
-  "homepage": "https://github.com/DennisdeBest/todo-kanban-card#readme",
+  "homepage": "https://github.com/DennisdeBest/HaTodoKanbanCard#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DennisdeBest/todo-kanban-card.git"
+    "url": "git+https://github.com/DennisdeBest/HaTodoKanbanCard.git"
   },
   "bugs": {
-    "url": "https://github.com/DennisdeBest/todo-kanban-card/issues"
+    "url": "https://github.com/DennisdeBest/HaTodoKanbanCard/issues"
   },
   "author": "Dennis de Best",
   "keywords": [
