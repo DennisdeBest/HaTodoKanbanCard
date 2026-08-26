@@ -1,7 +1,7 @@
 {
   "name": "todo-kanban-card",
   "version": "1.0.0",
-  "description": "A kanban board over Home Assistant todo lists — drag items between lists, edit them in place.",
+  "description": "A kanban board over Home Assistant todo lists \u2014 drag items between lists, edit them in place.",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -11,5 +11,22 @@
   },
   "devDependencies": {
     "jsdom": "^30.0.0"
-  }
+  },
+  "homepage": "https://github.com/DennisdeBest/todo-kanban-card#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DennisdeBest/todo-kanban-card.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DennisdeBest/todo-kanban-card/issues"
+  },
+  "author": "Dennis de Best",
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "lovelace-card",
+    "hacs",
+    "kanban",
+    "todo"
+  ]
 }
