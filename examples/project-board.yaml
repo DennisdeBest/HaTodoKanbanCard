@@ -1,0 +1,26 @@
+# Backlog / Doing / Done — the board everyone already knows.
+#
+# `default_collapsed: false` pins all three open: on a project board an empty Doing
+# column is information, not clutter, so it should not fold itself away.
+#
+# Done has `hide_add: true` because things arrive there by being dragged, never by
+# being typed. Leave `hide_completed` off so ticking something in Done still tucks it
+# under the fold and the lane does not grow forever.
+
+type: custom:todo-kanban-card
+title: House projects
+default_collapsed: false
+lanes:
+  - entity: todo.backlog
+    title: Backlog
+    icon: mdi:tray-full
+    color: var(--secondary-text-color)
+  - entity: todo.doing
+    title: Doing
+    icon: mdi:progress-wrench
+    color: var(--warning-color)
+  - entity: todo.done
+    title: Done
+    icon: mdi:check-decagram
+    color: var(--success-color)
+    hide_add: true

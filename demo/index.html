@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>todo-kanban-card — demo</title>
+<style>
+  :root {
+    color-scheme: light;
+    --primary-color: #03a9f4;
+    --accent-color: #ff9800;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --success-color: #43a047;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --text-primary-color: #ffffff;
+    --divider-color: rgba(0,0,0,.12);
+    --card-background-color: #fff;
+    --secondary-background-color: #e5e5e5;
+    --ha-card-border-radius: 12px;
+    --ha-card-box-shadow: 0 2px 6px rgba(0,0,0,.16);
+    --rgb-error-color: 219,68,55;
+    --mdc-icon-size: 24px;
+    --page-background: #f2f4f7;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --primary-color: #2196f3;
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b;
+    --divider-color: rgba(255,255,255,.12);
+    --card-background-color: #1c1c1c;
+    --secondary-background-color: #282828;
+    --page-background: #111213;
+  }
+  body {
+    margin: 0; padding: 24px 16px 64px;
+    background: var(--page-background); color: var(--primary-text-color);
+    font-family: Roboto, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  header.page { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header.page h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  header.page p { margin: 0; color: var(--secondary-text-color); font-size: 14px; flex: 1 1 100%; }
+  button.tool {
+    padding: 7px 14px; border-radius: 18px; border: 1px solid var(--divider-color);
+    background: var(--card-background-color); color: var(--primary-text-color);
+    font: inherit; font-size: 13px; cursor: pointer;
+  }
+  section.example > h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  section.example > p { margin: 0 0 10px; color: var(--secondary-text-color); font-size: 13px; }
+  .cfg {
+    margin-top: 10px; padding: 10px 12px; border-radius: 10px; overflow-x: auto;
+    background: var(--card-background-color); border: 1px solid var(--divider-color);
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5;
+    color: var(--secondary-text-color); white-space: pre;
+  }
+  /* Stand-ins for the two Home Assistant elements the card borrows. */
+  ha-card {
+    display: block; border-radius: var(--ha-card-border-radius);
+    background: var(--card-background-color); box-shadow: var(--ha-card-box-shadow);
+  }
+  ha-icon { display: inline-grid; place-items: center; width: var(--mdc-icon-size, 24px);
+            height: var(--mdc-icon-size, 24px); font-size: calc(var(--mdc-icon-size, 24px) * .8);
+            line-height: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>todo-kanban-card</h1>
+    <button class="tool" id="theme">Dark</button>
+    <button class="tool" id="reset">Reset the data</button>
+    <p>
+      A live board running against an in-memory stand-in for Home Assistant — no HA, no
+      network. Drag by the grip on the right of a row to reorder or to move an item to
+      another lane, click a row to edit it, click a lane header to fold it.
+      This is where to check a change before it goes anywhere near the real thing.
+    </p>
+  </header>
+  <div id="examples"></div>
+</div>
+
+<script type="module">
+import { createMockHass } from "./mock-hass.js";
+import "../todo-kanban-card.js";
+
+// Enough of `ha-icon` to see what a button is for. The real one draws MDI paths.
+const GLYPHS = {
+  "mdi:drag-horizontal-variant": "≡", "mdi:plus": "＋",
+  "mdi:chevron-down": "▾", "mdi:chevron-up": "▴", "mdi:check": "✓",
+  "mdi:delete-outline": "✗", "mdi:text": "…",
+  "mdi:alert-circle-outline": "⚠", "mdi:alert-octagon": "❗",
+  "mdi:cart": "\u{1F6D2}", "mdi:calendar-clock": "\u{1F4C5}",
+  "mdi:format-list-checks": "☰", "mdi:broom": "\u{1F9F9}",
+  "mdi:silverware-fork-knife": "\u{1F374}", "mdi:hammer-wrench": "\u{1F528}",
+  "mdi:bag-personal": "\u{1F392}", "mdi:progress-wrench": "⚙",
+  "mdi:check-decagram": "✅", "mdi:tray-full": "\u{1F4E5}",
+};
+customElements.define("ha-icon", class extends HTMLElement {
+  static get observedAttributes() { return ["icon"]; }
+  attributeChangedCallback() { this.textContent = GLYPHS[this.getAttribute("icon")] || "•"; }
+});
+
+const today = new Date();
+const day = (offset) => new Date(today.getTime() + offset * 86400000).toISOString().slice(0, 10);
+
+const EXAMPLES = [
+  {
+    id: "shopping",
+    heading: "Shopping, split by urgency",
+    blurb: "The board this card was written for. Something you need today, the normal run, and things to pick up eventually.",
+    lists: {
+      "todo.shopping_urgent": [{ summary: "Bin bags" }, { summary: "Cat litter", due: day(0) }],
+      "todo.shopping": [
+        { summary: "Lemon juice" }, { summary: "Smoked paprika" },
+        { summary: "Black peppercorns", description: "coarse, for the grinder" },
+        { summary: "Cling film", status: "completed" },
+      ],
+      "todo.shopping_long_haul": [{ summary: "New frying pan", due: day(24) }],
+    },
+    config: {
+      type: "custom:todo-kanban-card",
+      title: "Shopping",
+      lanes: [
+        { entity: "todo.shopping_urgent", title: "Urgent", icon: "mdi:alert-octagon", color: "var(--error-color)" },
+        { entity: "todo.shopping", title: "Normal", icon: "mdi:cart", color: "var(--primary-color)" },
+        { entity: "todo.shopping_long_haul", title: "Long haul", icon: "mdi:calendar-clock", color: "#9c27b0" },
+      ],
+    },
+  },
+  {
+    id: "board",
+    heading: "A project board",
+    blurb: "Backlog / Doing / Done, the classic. Dragging right is the whole interaction, and Done keeps its completed items out of the way.",
+    lists: {
+      "todo.backlog": [
+        { summary: "Insulate the loft hatch" }, { summary: "Bleed the radiators" },
+        { summary: "Replace the bathroom extractor" },
+      ],
+      "todo.doing": [{ summary: "Rewire the hallway light", due: day(2), description: "switch is in the cupboard" }],
+      "todo.done": [{ summary: "Fix the garden tap", status: "completed" }, { summary: "Seal the shed roof" }],
+    },
+    config: {
+      type: "custom:todo-kanban-card",
+      title: "House projects",
+      default_collapsed: false,
+      lanes: [
+        { entity: "todo.backlog", title: "Backlog", icon: "mdi:tray-full", color: "var(--secondary-text-color)" },
+        { entity: "todo.doing", title: "Doing", icon: "mdi:progress-wrench", color: "var(--warning-color)" },
+        { entity: "todo.done", title: "Done", icon: "mdi:check-decagram", color: "var(--success-color)", hide_add: true },
+      ],
+    },
+  },
+  {
+    id: "chores",
+    heading: "Chores by room",
+    blurb: "Completed items hidden, because a chore list is about what is left. Narrower lanes, so more of them fit across.",
+    lists: {
+      "todo.kitchen": [{ summary: "Descale the kettle" }, { summary: "Clean the oven", due: day(5) }],
+      "todo.bathroom": [{ summary: "Scrub the shower screen" }],
+      "todo.living_room": [{ summary: "Wash the throws" }, { summary: "Dust the shelves", status: "completed" }],
+      "todo.outside": [],
+    },
+    config: {
+      type: "custom:todo-kanban-card",
+      title: "Chores",
+      hide_completed: true,
+      min_lane_width: 200,
+      lanes: [
+        { entity: "todo.kitchen", title: "Kitchen", icon: "mdi:silverware-fork-knife" },
+        { entity: "todo.bathroom", title: "Bathroom", icon: "mdi:broom" },
+        { entity: "todo.living_room", title: "Living room", icon: "mdi:broom" },
+        { entity: "todo.outside", title: "Outside", icon: "mdi:hammer-wrench" },
+      ],
+    },
+  },
+];
+
+function yaml(value, indent = 0) {
+  const pad = "  ".repeat(indent);
+  if (Array.isArray(value)) {
+    return value.map((v) => {
+      const body = yaml(v, indent + 1).replace(/^\s+/, "");
+      return `${pad}- ${body}`;
+    }).join("\n");
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).map(([k, v], i) => {
+      const prefix = i === 0 && indent > 0 ? "" : pad;
+      if (v && typeof v === "object") return `${prefix}${k}:\n${yaml(v, indent + 1)}`;
+      return `${prefix}${k}: ${v}`;
+    }).join("\n");
+  }
+  return `${pad}${value}`;
+}
+
+function build() {
+  const host = document.getElementById("examples");
+  host.replaceChildren();
+  for (const example of EXAMPLES) {
+    const { hass } = createMockHass(example.lists);
+    const section = document.createElement("section");
+    section.className = "example";
+    section.innerHTML = `<h2>${example.heading}</h2><p>${example.blurb}</p>`;
+    const card = document.createElement("todo-kanban-card");
+    const { type, ...cfg } = example.config;
+    card.setConfig(cfg);
+    card.hass = hass;
+    section.appendChild(card);
+    const cfgBlock = document.createElement("div");
+    cfgBlock.className = "cfg";
+    cfgBlock.textContent = yaml(example.config);
+    section.appendChild(cfgBlock);
+    host.appendChild(section);
+  }
+}
+
+document.getElementById("theme").addEventListener("click", (ev) => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  ev.target.textContent = dark ? "Dark" : "Light";
+});
+document.getElementById("reset").addEventListener("click", () => {
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith("todo-kanban.")) localStorage.removeItem(key);
+  }
+  build();
+});
+
+build();
+</script>
+</body>
+</html>

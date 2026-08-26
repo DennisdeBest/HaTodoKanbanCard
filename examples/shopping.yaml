@@ -1,0 +1,31 @@
+# Shopping, split by how soon you need it.
+#
+# The board this card was written for. Three Local To-do lists; anything that turns out
+# to be more or less urgent than you thought gets dragged sideways instead of retyped.
+#
+# Pair it with a template sensor totalling the three, so a nav button can badge the
+# whole board rather than one list of it:
+#
+#   template:
+#     - sensor:
+#         - name: Shopping items outstanding
+#           state: >-
+#             {{ states('todo.shopping_urgent') | int(0)
+#                + states('todo.shopping') | int(0)
+#                + states('todo.shopping_long_haul') | int(0) }}
+
+type: custom:todo-kanban-card
+title: Shopping
+lanes:
+  - entity: todo.shopping_urgent
+    title: Urgent
+    icon: mdi:alert-octagon
+    color: var(--error-color)
+  - entity: todo.shopping
+    title: Normal
+    icon: mdi:cart
+    color: var(--primary-color)
+  - entity: todo.shopping_long_haul
+    title: Long haul
+    icon: mdi:calendar-clock
+    color: "#9c27b0"

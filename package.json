@@ -1,0 +1,15 @@
+{
+  "name": "todo-kanban-card",
+  "version": "1.0.0",
+  "description": "A kanban board over Home Assistant todo lists — drag items between lists, edit them in place.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/",
+    "demo": "node demo/serve.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.0"
+  }
+}

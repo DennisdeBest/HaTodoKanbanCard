@@ -1,0 +1,34 @@
+# Chores, one lane per room.
+#
+# `hide_completed: true` because a chore list is about what is left — a done pile that
+# refills every week is just noise. Narrower lanes so five rooms fit across a tablet;
+# on a phone they stack.
+#
+# Empty lanes fold themselves (the `auto` default), so a room with nothing outstanding
+# shrinks to one line and the rooms that need work stay in view.
+
+type: custom:todo-kanban-card
+title: Chores
+hide_completed: true
+min_lane_width: 200
+lanes:
+  - entity: todo.chores_kitchen
+    title: Kitchen
+    icon: mdi:silverware-fork-knife
+    color: var(--primary-color)
+  - entity: todo.chores_bathroom
+    title: Bathroom
+    icon: mdi:shower
+    color: "#00acc1"
+  - entity: todo.chores_living_room
+    title: Living room
+    icon: mdi:sofa
+    color: "#8e24aa"
+  - entity: todo.chores_bedroom
+    title: Bedroom
+    icon: mdi:bed
+    color: "#5c6bc0"
+  - entity: todo.chores_outside
+    title: Outside
+    icon: mdi:hammer-wrench
+    color: var(--success-color)

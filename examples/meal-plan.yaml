@@ -1,0 +1,40 @@
+# A week of dinners, one lane per day.
+#
+# The point is the drag: Thursday turns out to be a late one, so Thursday's meal moves
+# to Saturday and Saturday's beans move up. Retyping both is exactly the friction this
+# card exists to remove.
+#
+# `hide_completed: true` keeps last night's dinner from hanging around, and pinning the
+# lanes open (`default_collapsed: false`) keeps the week's shape visible even on the
+# days nothing is planned yet — an empty Wednesday is the thing you want to notice.
+
+type: custom:todo-kanban-card
+title: This week
+default_collapsed: false
+hide_completed: true
+min_lane_width: 170
+lanes:
+  - entity: todo.meals_monday
+    title: Mon
+    icon: mdi:numeric-1-circle-outline
+  - entity: todo.meals_tuesday
+    title: Tue
+    icon: mdi:numeric-2-circle-outline
+  - entity: todo.meals_wednesday
+    title: Wed
+    icon: mdi:numeric-3-circle-outline
+  - entity: todo.meals_thursday
+    title: Thu
+    icon: mdi:numeric-4-circle-outline
+  - entity: todo.meals_friday
+    title: Fri
+    icon: mdi:numeric-5-circle-outline
+    color: var(--warning-color)
+  - entity: todo.meals_saturday
+    title: Sat
+    icon: mdi:numeric-6-circle-outline
+    color: var(--warning-color)
+  - entity: todo.meals_sunday
+    title: Sun
+    icon: mdi:numeric-7-circle-outline
+    color: var(--warning-color)
