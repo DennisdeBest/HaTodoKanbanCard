@@ -9,6 +9,12 @@
 # days nothing is planned yet — an empty Wednesday is the thing you want to notice.
 
 type: custom:todo-kanban-card
+# In a `sections` view this is what gives the board the full width of its
+# section: a section's grid is 12 * column_span columns wide, so a plain
+# `columns: 12` would span only a third of a 3-span section. Harmless in any
+# other view type.
+grid_options:
+  columns: full
 title: This week
 default_collapsed: false
 hide_completed: true

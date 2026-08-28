@@ -136,19 +136,39 @@ into one when they will not. Nothing to configure, and no separate mobile layout
 Every colour is a Home Assistant CSS variable, so the card follows whatever theme is
 active rather than shipping a palette of its own.
 
-> **If the lanes will not sit side by side**, the card is almost never the thing
-> constraining them — the view is. A **sections** view grants columns by window width,
-> `max(1, floor((width - padding + gap) / (column_min_width + gap)))`, then clamps that
-> to the view's `max_columns`, and clamps a section's `column_span` to the result. With
-> the stock 320 px minimum and 32 px gap, three columns need about 1050 px of viewport,
-> and each column is capped at 500 px.
->
-> So for a three-lane board in a sections view, set the view's `max_columns: 3` **and**
-> the section's `column_span: 3` — one without the other does nothing. Two columns
-> (≈1030 px) is already enough room for three lanes. If you want the board to own the
-> whole screen regardless, use a `panel` view instead, which hands its first card the
-> entire view. `min_lane_width` is the card's own knob: lower it to pack more lanes into
-> whatever width the card ends up with.
+### If the lanes stack when there is clearly room
+
+The card is almost never what is constraining them — the **view** is, and in a
+`sections` view three settings have to agree. The third is the one that catches people:
+
+```yaml
+type: sections
+max_columns: 3            # 1. how many columns the view may use
+sections:
+  - type: grid
+    column_span: 3        # 2. how many of them this section occupies
+    cards:
+      - type: custom:todo-kanban-card
+        grid_options:
+          columns: full   # 3. how much of the section the card takes
+        lanes: [...]
+```
+
+**`columns: full` is the important one.** A section's internal grid is
+`12 × column_span` columns wide, so on a three-span section it has 36 — and the
+familiar "full width" value of `columns: 12` quietly spans exactly **one third** of it.
+`full` compiles to `grid-column: 1 / -1` and is the only value that means full width
+whatever the span.
+
+The other two are bounded by the window. A sections view grants
+`max(1, floor((width - padding + gap) / (column_min_width + gap)))` columns and then
+clamps that to `max_columns`, with a stock 320 px minimum, a 32 px gap and each column
+capped at 500 px — so three columns need roughly 1050 px of viewport. Two columns
+(≈1030 px) is already enough room for three lanes.
+
+If you would rather the board simply owned the screen, a `panel` view hands its first
+card the entire view and none of the above applies. And `min_lane_width` is the card's
+own knob: lower it to pack more lanes into whatever width the card ends up with.
 
 ## Try it without Home Assistant
 

@@ -8,6 +8,12 @@
 # shrinks to one line and the rooms that need work stay in view.
 
 type: custom:todo-kanban-card
+# In a `sections` view this is what gives the board the full width of its
+# section: a section's grid is 12 * column_span columns wide, so a plain
+# `columns: 12` would span only a third of a 3-span section. Harmless in any
+# other view type.
+grid_options:
+  columns: full
 title: Chores
 hide_completed: true
 min_lane_width: 200

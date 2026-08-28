@@ -8,6 +8,12 @@
 # under the fold and the lane does not grow forever.
 
 type: custom:todo-kanban-card
+# In a `sections` view this is what gives the board the full width of its
+# section: a section's grid is 12 * column_span columns wide, so a plain
+# `columns: 12` would span only a third of a 3-span section. Harmless in any
+# other view type.
+grid_options:
+  columns: full
 title: House projects
 default_collapsed: false
 lanes:
