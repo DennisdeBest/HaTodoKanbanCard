@@ -20,7 +20,7 @@
  * MIT licensed. See README.md for the full config reference and more examples.
  */
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const STORE = "todo-kanban.collapsed.";
 
 const DEFAULT_ICON = "mdi:format-list-checks";
@@ -94,8 +94,13 @@ class TodoKanbanCard extends HTMLElement {
     this._drag = null;
     this._error = null;
     this._focus = null;      // [key, selectionStart] to restore after a re-render
+    this._lanes = new Map(); // entity -> the lane <section>, reused across renders
+    this._shell = null;
+    this._shellKey = null;
+    this._scrollRaf = null;
     this._onDragMove = this._onDragMove.bind(this);
     this._onDragEnd = this._onDragEnd.bind(this);
+    this._autoScroll = this._autoScroll.bind(this);
   }
 
   static getStubConfig() {
@@ -368,34 +373,113 @@ class TodoKanbanCard extends HTMLElement {
       dy: ev.clientY - rect.top,
       placeholder: el("div", { class: "placeholder" }),
       target: null,
+      point: { x: ev.clientX, y: ev.clientY },
+      scrollers: this._scrollParents(),
+      pointerId: ev.pointerId,
+      capture: null,
     };
+    // Capturing the pointer keeps touch drags alive: without it the browser is free to
+    // decide mid-gesture that this was really a scroll and fire pointercancel.
+    if (ev.pointerId !== undefined && ev.target.setPointerCapture) {
+      try {
+        ev.target.setPointerCapture(ev.pointerId);
+        this._drag.capture = ev.target;
+      } catch (err) { /* not supported here */ }
+    }
     block.classList.add("dragging");
     block.parentNode.insertBefore(this._drag.placeholder, block);
-    this._positionGhost(ev);
+    this._positionGhost(ev.clientX, ev.clientY);
     document.addEventListener("pointermove", this._onDragMove, { passive: false });
     document.addEventListener("pointerup", this._onDragEnd);
     document.addEventListener("pointercancel", this._onDragEnd);
+    this._scrollRaf = requestAnimationFrame(this._autoScroll);
   }
 
-  _positionGhost(ev) {
+  /*
+   * Every scrollable ancestor, innermost first — crossing shadow boundaries, since the
+   * card sits several shadow roots deep inside a Home Assistant dashboard and the thing
+   * that actually scrolls is one of them, not the window.
+   */
+  _scrollParents() {
+    const out = [];
+    let node = this;
+    let guard = 0;
+    while (node && guard++ < 100) {
+      if (node.nodeType === 1 && node !== this) {
+        let style = null;
+        try { style = getComputedStyle(node); } catch (err) { /* detached */ }
+        if (style && /(auto|scroll|overlay)/.test(style.overflowY)
+            && node.scrollHeight > node.clientHeight + 1) {
+          out.push(node);
+        }
+      }
+      const root = node.getRootNode && node.getRootNode();
+      node = node.parentElement || (root && root.host) || null;
+    }
+    const doc = document.scrollingElement || document.documentElement;
+    if (doc && doc.scrollHeight > doc.clientHeight + 1) out.push(doc);
+    return out;
+  }
+
+  /*
+   * Hold the item near the top or bottom of the screen and the page follows. Without
+   * this a phone cannot move an item into a lane that is off the bottom of the
+   * viewport: the grip sets `touch-action: none` so the browser will not scroll for us,
+   * and a finger held still fires no further pointermove events — hence the rAF loop,
+   * which re-runs the drop calculation itself rather than waiting to be told.
+   */
+  _autoScroll() {
+    this._scrollRaf = null;
+    if (!this._drag) return;
+    const { x, y } = this._drag.point;
+    const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    const EDGE = 90;   // px from the edge where scrolling starts
+    const SPEED = 24;  // px per frame at the very edge
+
+    let dy = 0;
+    if (y < EDGE) dy = -SPEED * Math.min(1, (EDGE - y) / EDGE);
+    else if (y > height - EDGE) dy = SPEED * Math.min(1, (y - (height - EDGE)) / EDGE);
+
+    if (dy) {
+      for (const node of this._drag.scrollers) {
+        const before = node.scrollTop;
+        node.scrollTop = before + dy;
+        if (node.scrollTop !== before) break; // whichever one actually moved wins
+      }
+      this._updateDrop(x, y);
+    }
+    this._scrollRaf = requestAnimationFrame(this._autoScroll);
+  }
+
+  _positionGhost(x, y) {
     const g = this._drag.ghost;
-    g.style.left = `${ev.clientX - this._drag.dx}px`;
-    g.style.top = `${ev.clientY - this._drag.dy}px`;
+    g.style.left = `${x - this._drag.dx}px`;
+    g.style.top = `${y - this._drag.dy}px`;
   }
 
   _onDragMove(ev) {
     if (!this._drag) return;
     ev.preventDefault();
-    this._positionGhost(ev);
+    this._drag.point = { x: ev.clientX, y: ev.clientY };
+    this._positionGhost(ev.clientX, ev.clientY);
+    this._updateDrop(ev.clientX, ev.clientY);
+  }
 
-    const under = this.shadowRoot.elementFromPoint(ev.clientX, ev.clientY);
-    const laneEl = under && under.closest("[data-lane]");
+  // Where would the item land if it were dropped at (x, y)? Moves the placeholder and
+  // records the answer on `_drag.target`. Called on pointer move and, while the pointer
+  // is parked at a screen edge, on every autoscroll frame.
+  _updateDrop(x, y) {
+    // `DocumentOrShadowRoot.elementFromPoint` is missing in some environments (jsdom
+    // among them); without it there is nothing to hit-test against, so the drag simply
+    // keeps the target it already had rather than throwing halfway through.
+    const root = this.shadowRoot;
+    const under = root.elementFromPoint ? root.elementFromPoint(x, y) : null;
+    const laneEl = under && under.closest && under.closest("[data-lane]");
     if (!laneEl) return;
     const entity = laneEl.getAttribute("data-lane");
-    const list = laneEl.querySelector(".items");
 
-    // A collapsed lane has no visible list; dropping on its header appends.
-    if (!list) {
+    // A folded lane shows only its header. Dropping on it appends to the end.
+    if (laneEl.classList.contains("collapsed") || laneEl.classList.contains("gone")) {
       this._drag.target = { entity, beforeUid: null, append: true };
       if (this._drag.placeholder.parentNode) this._drag.placeholder.remove();
       laneEl.classList.add("drop-target");
@@ -403,6 +487,8 @@ class TodoKanbanCard extends HTMLElement {
       return;
     }
     this._clearDropTargets(null);
+    const list = laneEl.querySelector(".items");
+    if (!list) return;
 
     // Direct children only. An item with its editor open is wrapped in a div, and
     // insertBefore against a grandchild throws.
@@ -412,7 +498,7 @@ class TodoKanbanCard extends HTMLElement {
     let beforeRow = null;
     for (const r of rows) {
       const box = r.getBoundingClientRect();
-      if (ev.clientY < box.top + box.height / 2) {
+      if (y < box.top + box.height / 2) {
         beforeRow = r;
         break;
       }
@@ -474,42 +560,72 @@ class TodoKanbanCard extends HTMLElement {
     document.removeEventListener("pointermove", this._onDragMove);
     document.removeEventListener("pointerup", this._onDragEnd);
     document.removeEventListener("pointercancel", this._onDragEnd);
+    if (this._scrollRaf !== null) {
+      cancelAnimationFrame(this._scrollRaf);
+      this._scrollRaf = null;
+    }
+    const drag = this._drag;
+    if (drag && drag.capture && drag.pointerId !== undefined) {
+      try { drag.capture.releasePointerCapture(drag.pointerId); } catch (err) { /* gone */ }
+    }
   }
 
   // ------------------------------------------------------------------ render
 
+  /*
+   * The board is built once and then updated in place. It used to be torn down and
+   * rebuilt on every push, which destroyed the "add an item" input along with
+   * everything else — so the field lost focus after each add, and on a phone the
+   * keyboard closed between every item. Keeping the lane elements alive means the
+   * input is never recreated, and adding five things in a row is five keystrokes and
+   * five taps of enter rather than a re-focus in between.
+   */
   _render() {
     if (!this._config) return;
     if (this._drag) return; // never redraw the board out from under a drag
     this._pending = false;
 
-    const active = this.shadowRoot.activeElement;
-    if (active && active.dataset && active.dataset.focus) {
-      this._focus = [active.dataset.focus, active.selectionStart];
-    }
-
     const root = this.shadowRoot;
-    // `:scope > *` does not match against a ShadowRoot — the old board would pile up
-    // underneath the new one. Caught in a jsdom harness before this ever shipped.
-    while (root.firstChild) root.firstChild.remove();
-    root.appendChild(el("style", { text: STYLE }));
+    const key = this._config.lanes.map((l) => l.entity).join("|");
 
-    const card = el("ha-card", {});
-    if (this._config.title) card.appendChild(el("h1", { class: "card-title", text: this._config.title }));
-    if (this._error) {
-      card.appendChild(el("div", { class: "error" }, [icon("mdi:alert-circle-outline"), this._error]));
+    if (this._shellKey !== key) {
+      // `:scope > *` does not match against a ShadowRoot — the old board would pile up
+      // underneath the new one. Caught in a jsdom harness before this ever shipped.
+      while (root.firstChild) root.firstChild.remove();
+      root.appendChild(el("style", { text: STYLE }));
+
+      const title = el("h1", { class: "card-title" });
+      const error = el("div", { class: "error" });
+      const board = el("div", { class: "board" });
+      const card = el("ha-card", {}, [title, error, board]);
+      root.appendChild(card);
+
+      this._lanes = new Map();
+      for (const lane of this._config.lanes) {
+        const node = this._buildLane(lane);
+        this._lanes.set(lane.entity, node);
+        board.appendChild(node);
+      }
+      this._shell = { title, error, board };
+      this._shellKey = key;
     }
-    const board = el("div", {
-      class: "board",
-      style: { "--lane-min": `${parseInt(this._config.min_lane_width, 10) || 270}px` },
-    });
-    for (const lane of this._config.lanes) board.appendChild(this._renderLane(lane));
-    card.appendChild(board);
-    root.appendChild(card);
 
+    const { title, error, board } = this._shell;
+    title.textContent = this._config.title || "";
+    title.hidden = !this._config.title;
+    error.replaceChildren(
+      ...(this._error ? [icon("mdi:alert-circle-outline"), document.createTextNode(this._error)] : [])
+    );
+    error.hidden = !this._error;
+    board.style.setProperty("--lane-min", `${parseInt(this._config.min_lane_width, 10) || 270}px`);
+
+    for (const lane of this._config.lanes) this._syncLane(this._lanes.get(lane.entity), lane);
+
+    // Only a safety net now that the add row survives a render: the item editor still
+    // gets rebuilt, so a caret in one of its fields is restored here.
     if (this._focus) {
-      const [key, caret] = this._focus;
-      const target = root.querySelector(`[data-focus="${key}"]`);
+      const [fkey, caret] = this._focus;
+      const target = root.querySelector(`[data-focus="${fkey}"]`);
       if (target) {
         target.focus();
         if (caret !== null && caret !== undefined && target.setSelectionRange) {
@@ -520,79 +636,100 @@ class TodoKanbanCard extends HTMLElement {
     }
   }
 
-  _renderLane(lane) {
+  // The parts of a lane that never change. The add row is in here deliberately: it is
+  // built once for the life of the card and `_syncLane` does not touch it.
+  _buildLane(lane) {
     const entity = lane.entity;
-    const items = this._items[entity] || [];
-    const open = items.filter((i) => i.status !== "completed");
-    const done = this._opt(lane, "hide_completed")
+    const laneEl = el("section", { class: "lane", "data-lane": entity });
+    if (lane.color) laneEl.style.setProperty("--lane-accent", lane.color);
+
+    const head = el("header", {
+      class: "lane-head",
+      onclick: () => {
+        this._store(entity, laneEl.classList.contains("collapsed") ? "0" : "1");
+        this._render();
+      },
+    });
+    const missing = el("div", { class: "missing" });
+    const items = el("div", { class: "items" });
+    const done = el("div", { class: "done-wrap" });
+
+    laneEl.append(head, missing, items);
+    if (!this._opt(lane, "hide_add")) laneEl.appendChild(this._renderAdd(entity));
+    laneEl.appendChild(done);
+
+    laneEl._parts = { head, missing, items, done };
+    return laneEl;
+  }
+
+  // Everything that depends on the current items. Rebuilds the header, the item rows
+  // and the completed section; never the add row.
+  _syncLane(laneEl, lane) {
+    const entity = lane.entity;
+    const { head, missing, items, done } = laneEl._parts;
+
+    const all = this._items[entity] || [];
+    const open = all.filter((i) => i.status !== "completed");
+    const doneItems = this._opt(lane, "hide_completed")
       ? []
-      : items.filter((i) => i.status === "completed");
+      : all.filter((i) => i.status === "completed");
+
     const stateObj = this._hass && this._hass.states[entity];
     const title = lane.title || (stateObj && stateObj.attributes.friendly_name) || entity;
     const collapsed = this._collapsed(lane, open.length);
+    laneEl.classList.toggle("collapsed", collapsed);
 
-    const laneEl = el("section", {
-      class: `lane${collapsed ? " collapsed" : ""}`,
-      "data-lane": entity,
-      style: lane.color ? { "--lane-accent": lane.color } : undefined,
-    });
-
-    laneEl.appendChild(el("header", {
-      class: "lane-head",
-      onclick: () => {
-        this._store(entity, collapsed ? "0" : "1");
-        this._render();
-      },
-    }, [
+    head.replaceChildren(
       icon(lane.icon || DEFAULT_ICON, "lane-icon"),
       el("span", { class: "lane-title", text: title }),
       open.length
         ? el("span", { class: "count", text: String(open.length) })
         : icon("mdi:check", "count done"),
-      icon(collapsed ? "mdi:chevron-down" : "mdi:chevron-up", "chev"),
-    ]));
+      icon(collapsed ? "mdi:chevron-down" : "mdi:chevron-up", "chev")
+    );
 
-    if (this._hass && !stateObj) {
-      laneEl.appendChild(el("div", { class: "missing", text: `${entity} is not available` }));
-      return laneEl;
+    const gone = !!this._hass && !stateObj;
+    laneEl.classList.toggle("gone", gone);
+    missing.hidden = !gone;
+    missing.textContent = gone ? `${entity} is not available` : "";
+    if (gone) {
+      items.replaceChildren();
+      done.replaceChildren();
+      return;
     }
-    if (collapsed) return laneEl;
 
-    const list = el("div", { class: "items" });
-    if (!open.length && !done.length) {
-      list.appendChild(el("div", { class: "empty", text: "Nothing on this list" }));
+    const rows = open.map((item) => this._renderItem(entity, item));
+    if (!open.length && !doneItems.length) {
+      rows.push(el("div", { class: "empty", text: "Nothing on this list" }));
     }
-    for (const item of open) list.appendChild(this._renderItem(entity, item));
-    laneEl.appendChild(list);
+    items.replaceChildren(...rows);
 
-    if (!this._opt(lane, "hide_add")) laneEl.appendChild(this._renderAdd(entity));
-
-    if (done.length && !this._opt(lane, "hide_completed")) {
-      const showing = !!this._showDone[entity];
-      laneEl.appendChild(el("div", { class: "done-head" }, [
+    if (!doneItems.length) {
+      done.replaceChildren();
+      return;
+    }
+    const showing = !!this._showDone[entity];
+    const parts = [
+      el("div", { class: "done-head" }, [
         el("button", {
           class: "link",
           onclick: () => {
             this._showDone[entity] = !showing;
             this._render();
           },
-        }, [
-          icon(showing ? "mdi:chevron-up" : "mdi:chevron-down"),
-          `${done.length} done`,
-        ]),
+        }, [icon(showing ? "mdi:chevron-up" : "mdi:chevron-down"), `${doneItems.length} done`]),
         el("button", {
           class: "link danger",
           text: "Clear",
           onclick: () => this._call("remove_completed_items", { entity_id: entity }),
         }),
-      ]));
-      if (showing) {
-        const dl = el("div", { class: "items done-items" });
-        for (const item of done) dl.appendChild(this._renderItem(entity, item));
-        laneEl.appendChild(dl);
-      }
+      ]),
+    ];
+    if (showing) {
+      parts.push(el("div", { class: "items done-items" },
+        doneItems.map((item) => this._renderItem(entity, item))));
     }
-    return laneEl;
+    done.replaceChildren(...parts);
   }
 
   _renderItem(entity, item) {
@@ -714,13 +851,22 @@ class TodoKanbanCard extends HTMLElement {
     };
     return el("div", { class: "add" }, [
       input,
-      el("button", { class: "icon-btn", title: "Add", onclick: submit }, [icon("mdi:plus")]),
+      el("button", {
+        class: "icon-btn",
+        title: "Add",
+        // Stops the tap moving focus off the input, so the caret stays put and a phone
+        // keyboard does not close between items. Programmatically re-focusing after the
+        // fact does not reopen a mobile keyboard, so it has to never leave.
+        onmousedown: (ev) => ev.preventDefault(),
+        onclick: submit,
+      }, [icon("mdi:plus")]),
     ]);
   }
 }
 
 const STYLE = `
 :host { display: block; }
+[hidden] { display: none !important; }
 ha-card { padding: 8px 8px 12px; }
 .card-title {
   font-size: var(--ha-font-size-l, 20px); font-weight: 500;
@@ -743,6 +889,12 @@ ha-card { padding: 8px 8px 12px; }
   border: 1px solid transparent;
 }
 .lane.drop-target { border-color: var(--lane-accent); }
+.lane.collapsed .items,
+.lane.collapsed .add,
+.lane.collapsed .done-wrap,
+.lane.gone .items,
+.lane.gone .add,
+.lane.gone .done-wrap { display: none; }
 .lane-head {
   display: flex; align-items: center; gap: 8px; padding: 8px 6px; cursor: pointer;
   user-select: none;

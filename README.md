@@ -9,15 +9,12 @@ card has no control for it. So an item that landed on the wrong list stays there
 gets deleted and retyped. This card fixes that, and arranges any number of lists as
 lanes while it is at it.
 
-```
-┌─ Urgent  ❗2 ────────┐ ┌─ Normal  🛒5 ───────┐ ┌─ Long haul  📅1 ────┐
-│ ☐ Bin bags        ≡ │ │ ☐ Lemon juice    ≡ │ │ ☐ New frying pan  ≡ │
-│ ☐ Cat litter today≡ │ │ ☐ Smoked paprika ≡ │ │ ＋ Add an item      │
-│ ＋ Add an item      │ │ ☐ Peppercorns  … ≡ │ └─────────────────────┘
-└─────────────────────┘ │ ＋ Add an item      │
-                        │ ▾ 1 done     Clear  │
-                        └─────────────────────┘
-```
+![The shopping board](docs/shopping.png)
+
+**Moving an item between lists is the whole point.** Drag by the handle on the right of
+a row — to another position, or to another lane:
+
+![Dragging an item from one list to another](docs/drag.gif)
 
 ## What it does
 
@@ -30,6 +27,11 @@ lanes while it is at it.
   which keeps a five-lane board readable.
 - **Live**: one `todo/item/subscribe` per lane, so the board follows changes from the
   companion app, another tablet or an automation without a refresh.
+
+Tap a row to edit it in place — rename, due date, note, delete, and a **Move to** row
+that does the same job as a drag for when a drag is not practical:
+
+![The item editor](docs/editor.png)
 
 It works with any `todo` provider — Local To-do, CalDAV, Google Tasks, Shopping List —
 though moving an item needs the source list to support deleting and the target to
@@ -112,6 +114,34 @@ worked examples are in [`examples/`](examples/):
 | [`chores.yaml`](examples/chores.yaml) | One lane per room, completed items hidden, narrower lanes. |
 | [`meal-plan.yaml`](examples/meal-plan.yaml) | A lane per day, so a meal can be dragged to another evening. |
 
+A project board — lanes pinned open, and nothing typed straight into Done:
+
+![Backlog, Doing and Done](docs/project-board.png)
+
+Chores by room — completed items hidden, and `min_lane_width` turned down so five lanes
+fit across:
+
+![One lane per room](docs/chores.png)
+
+### On a phone, and in the dark
+
+Lanes are laid out with `auto-fit`, so they use as many columns as will fit and stack
+into one when they will not. Nothing to configure, and no separate mobile layout:
+
+<p>
+  <img src="docs/mobile.png" alt="The same board stacked on a phone" width="290">
+  <img src="docs/shopping-dark.png" alt="The board in a dark theme" width="560">
+</p>
+
+Every colour is a Home Assistant CSS variable, so the card follows whatever theme is
+active rather than shipping a palette of its own.
+
+> **If the lanes will not sit side by side**, the card is not the thing constraining
+> them — a **sections** view is. Each section column is capped at about 500 px, so raise
+> the view's `max_columns` and give the section a matching `column_span`
+> (`max_columns: 3` and `column_span: 3` for a three-lane board). `min_lane_width` sets
+> the point at which lanes wrap; lower it to fit more across.
+
 ## Try it without Home Assistant
 
 The repo ships a demo page that runs the real card against an in-memory stand-in for
@@ -128,17 +158,25 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 48 assertions in jsdom
+npm test        # 58 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
+npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 ```
 
 The card is a plain custom element — no build step, no dependencies, no lit. Edit
-`todo-kanban-card.js` and reload.
+`todo-kanban-card.js` and reload. The dev dependencies are only for testing and for
+taking the pictures; nothing is bundled into the card.
 
-`npm test` covers rendering, folding, every control, the item editor and the drop
-arithmetic, plus the demo's mock driven by the real card. What it cannot cover is
-dragging: jsdom has no layout, so `getBoundingClientRect` is all zeros and there is
-nothing under a pointer. Use the demo page for that.
+`npm test` covers rendering, folding, every control, the item editor, adding several
+items in a row, the autoscroll decision and the drop arithmetic, plus the demo's mock
+driven by the real card. What it cannot cover is the pointer half of dragging: jsdom has
+no layout, so `getBoundingClientRect` is all zeros and `elementFromPoint` does not
+exist. Use the demo page for that.
+
+`npm run shots` drives the demo page in headless Chrome and rewrites everything in
+`docs/`, animation included. Shooting the demo rather than a real dashboard keeps the
+pictures deterministic and free of anyone's house data, while still being the real card.
+Re-run it after a visual change and commit whatever moved.
 
 ## How it works, and what that costs
 
@@ -156,12 +194,23 @@ nothing under a pointer. Use the demo page for that.
 - Dragging is pointer-events based and starts from the grip handle only, so the rest of
   the row keeps scrolling normally on a touchscreen. Every action a drag can perform is
   also in the item editor, for when a drag is not practical.
+- **Holding a dragged item near the top or bottom of the screen scrolls the page**, so a
+  lane below the fold is reachable on a phone. The grip sets `touch-action: none` — which
+  is what stops the browser scrolling instead of dragging — so the card has to do that
+  scrolling itself, and a finger held still fires no more pointer events, hence an
+  animation-frame loop that re-runs the drop calculation as the page moves.
+- **The board updates in place rather than being rebuilt.** That is what lets the "add an
+  item" field keep focus and the caret across a change, so you can add five things
+  without touching the field again — and on a phone the keyboard stays open, which a
+  programmatic re-focus cannot achieve.
 
 ## Not there yet
 
 - No visual editor — YAML only.
 - No per-item due **time**, only dates.
 - No filtering or sorting; lanes show the list in its own order.
+- No horizontal autoscroll while dragging. Lanes wrap rather than overflow, so there is
+  usually nothing to scroll sideways to.
 
 Issues and pull requests welcome.
 

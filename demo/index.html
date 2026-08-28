@@ -50,6 +50,9 @@
   }
   section.example > h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
   section.example > p { margin: 0 0 10px; color: var(--secondary-text-color); font-size: 13px; }
+  body.bare { padding: 16px; background: var(--page-background); }
+  body.bare header.page { display: none; }
+  body.bare .wrap { gap: 0; }
   .cfg {
     margin-top: 10px; padding: 10px 12px; border-radius: 10px; overflow-x: auto;
     background: var(--card-background-color); border: 1px solid var(--divider-color);
@@ -61,9 +64,10 @@
     display: block; border-radius: var(--ha-card-border-radius);
     background: var(--card-background-color); box-shadow: var(--ha-card-box-shadow);
   }
-  ha-icon { display: inline-grid; place-items: center; width: var(--mdc-icon-size, 24px);
-            height: var(--mdc-icon-size, 24px); font-size: calc(var(--mdc-icon-size, 24px) * .8);
-            line-height: 1; }
+  ha-icon { display: inline-flex; align-items: center; justify-content: center;
+            width: var(--mdc-icon-size, 24px); height: var(--mdc-icon-size, 24px);
+            flex: none; }
+  ha-icon svg { width: 100%; height: 100%; display: block; }
 </style>
 </head>
 <body>
@@ -84,23 +88,36 @@
 
 <script type="module">
 import { createMockHass } from "./mock-hass.js";
+import { ICON_PATHS } from "./icons.js";
 import "../todo-kanban-card.js";
 
-// Enough of `ha-icon` to see what a button is for. The real one draws MDI paths.
-const GLYPHS = {
-  "mdi:drag-horizontal-variant": "≡", "mdi:plus": "＋",
-  "mdi:chevron-down": "▾", "mdi:chevron-up": "▴", "mdi:check": "✓",
-  "mdi:delete-outline": "✗", "mdi:text": "…",
-  "mdi:alert-circle-outline": "⚠", "mdi:alert-octagon": "❗",
-  "mdi:cart": "\u{1F6D2}", "mdi:calendar-clock": "\u{1F4C5}",
-  "mdi:format-list-checks": "☰", "mdi:broom": "\u{1F9F9}",
-  "mdi:silverware-fork-knife": "\u{1F374}", "mdi:hammer-wrench": "\u{1F528}",
-  "mdi:bag-personal": "\u{1F392}", "mdi:progress-wrench": "⚙",
-  "mdi:check-decagram": "✅", "mdi:tray-full": "\u{1F4E5}",
-};
+// A stand-in for Home Assistant's `<ha-icon>`, drawing the same Material Design Icons
+// it would. The card never imports these — in a dashboard the real element resolves
+// them — so this exists purely so the demo, and the screenshots taken from it, look
+// like the real thing. Paths come from demo/icons.js (`npm run icons`).
+const SVG_NS = "http://www.w3.org/2000/svg";
 customElements.define("ha-icon", class extends HTMLElement {
   static get observedAttributes() { return ["icon"]; }
-  attributeChangedCallback() { this.textContent = GLYPHS[this.getAttribute("icon")] || "•"; }
+  attributeChangedCallback() {
+    const d = ICON_PATHS[this.getAttribute("icon")];
+    this.replaceChildren();
+    // Inline styles, not a stylesheet: these elements live inside the card's shadow
+    // root, which the demo page's CSS cannot reach. Without this the icons render at
+    // zero size and the board looks like it has none at all.
+    this.style.cssText =
+      "display:inline-flex;align-items:center;justify-content:center;flex:none;" +
+      "width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px);";
+    if (!d) return;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.style.cssText = "width:100%;height:100%;display:block;";
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "currentColor");
+    svg.appendChild(path);
+    this.appendChild(svg);
+  }
 });
 
 const today = new Date();
@@ -196,23 +213,38 @@ function yaml(value, indent = 0) {
   return `${pad}${value}`;
 }
 
+/*
+ * Query parameters, used by scripts/shots.mjs to capture the README images:
+ *   ?only=<id>   render just that example
+ *   ?bare        drop the page header and the YAML block, leaving the card alone
+ *   ?theme=dark  force the dark palette
+ * Without them the page is the normal three-board playground.
+ */
+const PARAMS = new URLSearchParams(location.search);
+const ONLY = PARAMS.get("only");
+const BARE = PARAMS.has("bare");
+if (PARAMS.get("theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
+if (BARE) document.body.classList.add("bare");
+
 function build() {
   const host = document.getElementById("examples");
   host.replaceChildren();
-  for (const example of EXAMPLES) {
+  for (const example of EXAMPLES.filter((e) => !ONLY || e.id === ONLY)) {
     const { hass } = createMockHass(example.lists);
     const section = document.createElement("section");
     section.className = "example";
-    section.innerHTML = `<h2>${example.heading}</h2><p>${example.blurb}</p>`;
+    if (!BARE) section.innerHTML = `<h2>${example.heading}</h2><p>${example.blurb}</p>`;
     const card = document.createElement("todo-kanban-card");
     const { type, ...cfg } = example.config;
     card.setConfig(cfg);
     card.hass = hass;
     section.appendChild(card);
-    const cfgBlock = document.createElement("div");
-    cfgBlock.className = "cfg";
-    cfgBlock.textContent = yaml(example.config);
-    section.appendChild(cfgBlock);
+    if (!BARE) {
+      const cfgBlock = document.createElement("div");
+      cfgBlock.className = "cfg";
+      cfgBlock.textContent = yaml(example.config);
+      section.appendChild(cfgBlock);
+    }
     host.appendChild(section);
   }
 }

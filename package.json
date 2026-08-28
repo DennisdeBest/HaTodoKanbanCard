@@ -7,10 +7,14 @@
   "private": true,
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "demo": "node demo/serve.mjs"
+    "demo": "node demo/serve.mjs",
+    "shots": "node scripts/shots.mjs",
+    "icons": "node scripts/gen-icons.mjs"
   },
   "devDependencies": {
-    "jsdom": "^30.0.0"
+    "@mdi/js": "^7.4.47",
+    "jsdom": "^30.0.0",
+    "puppeteer-core": "^25.9.0"
   },
   "homepage": "https://github.com/DennisdeBest/HaTodoKanbanCard#readme",
   "repository": {
@@ -28,5 +32,8 @@
     "hacs",
     "kanban",
     "todo"
-  ]
+  ],
+  "dependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
 }

@@ -12,7 +12,8 @@ export function setupDom() {
     pretendToBeVisual: true,
   });
   for (const k of ["window", "document", "HTMLElement", "customElements", "CustomEvent",
-                   "Event", "Node", "localStorage", "requestAnimationFrame"]) {
+                   "Event", "Node", "localStorage", "requestAnimationFrame",
+                   "cancelAnimationFrame", "getComputedStyle"]) {
     globalThis[k] = k === "window" ? dom.window : dom.window[k];
   }
   return dom;
