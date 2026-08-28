@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1
+
+Documentation only — the card itself is unchanged from 1.2.0.
+
+- **The screenshots now render inside HACS.** HACS shows a repository's README by
+  fetching it raw from GitHub at the release tag, and does not rewrite relative links —
+  so every `docs/*.png` resolved against the reader's own Home Assistant and 404'd, in
+  exactly the view someone uses to decide whether to install. The image URLs are
+  absolute now, which GitHub renders identically.
+- An "open this repository in HACS" button, release and licence badges, and issue
+  templates that ask for the version, the card YAML, and whether the problem happened on
+  a phone or a desktop — dragging and the keyboard behave differently on each.
+
 ## 1.2.0
 
 - **A visual editor.** Adding the card from the picker now opens a proper form instead
