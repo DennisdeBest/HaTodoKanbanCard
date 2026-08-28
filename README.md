@@ -59,11 +59,16 @@ Bump the `?v=` whenever you replace the file, or browsers will keep the old copy
 
 ## Configure
 
-**There is a visual editor.** Add the card from the picker and you get list pickers, a
-name, an icon and a colour per list, plus the card-wide options — no YAML needed. Lists
-can be reordered and removed there too. Per-list overrides (`hide_add`,
-`hide_completed`, `default_collapsed`) are YAML-only, and the editor leaves them alone
-if you have set them.
+**There is a visual editor.** Add the card from the picker and you get a form: which
+lists, what each is called, an icon and a colour for each, and the card-wide options.
+Lists can be reordered and removed there too — no YAML needed.
+
+![The visual editor](docs/editor-visual.png)
+
+The pickers are Home Assistant's own, so the entity list is filtered to your `todo`
+entities, the icon field previews as you type, and the colours are the theme palette.
+Per-list overrides (`hide_add`, `hide_completed`, `default_collapsed`) are YAML-only,
+and the editor leaves them alone if you have set them.
 
 The YAML underneath, for anyone who prefers it:
 
@@ -195,6 +200,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 npm test        # 77 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
+npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)
 ```
 
 The card is a plain custom element — no build step, no dependencies, no lit. Edit
@@ -211,6 +217,14 @@ exist. Use the demo page for that.
 `docs/`, animation included. Shooting the demo rather than a real dashboard keeps the
 pictures deterministic and free of anyone's house data, while still being the real card.
 Re-run it after a visual change and commit whatever moved.
+
+The editor is the one thing the demo cannot show, since it is built from `ha-form`,
+`ha-entity-picker` and friends, which only exist inside a dashboard. `npm run shots:editor`
+therefore needs a real instance; it reads from it and changes nothing. Note that the
+editor has to be mounted **inside `<home-assistant>`** to be photographed: the entity
+picker takes its translations from a lit context provided on that element, so anywhere
+else it throws and renders as an empty gap while the colour and icon fields carry on
+looking fine.
 
 ## How it works, and what that costs
 

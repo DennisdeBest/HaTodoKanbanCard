@@ -9,7 +9,8 @@
     "test": "node --test test/*.test.mjs",
     "demo": "node demo/serve.mjs",
     "shots": "node scripts/shots.mjs",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "shots:editor": "node scripts/shot-editor.mjs"
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
