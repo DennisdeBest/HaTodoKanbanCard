@@ -20,7 +20,7 @@
  * MIT licensed. See README.md for the full config reference and more examples.
  */
 
-const VERSION = "1.1.0-beta.3";
+const VERSION = "1.1.0";
 const STORE = "todo-kanban.collapsed.";
 
 const DEFAULT_ICON = "mdi:format-list-checks";
