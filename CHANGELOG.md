@@ -35,3 +35,11 @@ Three things that only show up once the card is in daily use, two of them on a p
 Also: the README has screenshots and an animation of a drag, generated from the demo page
 by `npm run shots`; and a note on why lanes sometimes refuse to sit side by side (a
 sections view caps each column at ~500 px — raise `max_columns` and `column_span`).
+
+## 1.1.0-beta.2
+
+- **Completed items no longer have a drag handle.** Dragging one appeared to work and
+  then snapped back: `todo/item/move` changes an item's position, not its status, so the
+  next render returned it to the "done" section. Dropping it on another lane was worse —
+  it arrived there silently un-completed, because a move is an add followed by a remove
+  and an added item is always `needs_action`. Tick it first, then move it.

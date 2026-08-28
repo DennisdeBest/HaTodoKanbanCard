@@ -20,7 +20,7 @@
  * MIT licensed. See README.md for the full config reference and more examples.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.0-beta.2";
 const STORE = "todo-kanban.collapsed.";
 
 const DEFAULT_ICON = "mdi:format-list-checks";
@@ -764,7 +764,11 @@ class TodoKanbanCard extends HTMLElement {
 
     row.appendChild(box);
     row.appendChild(label);
-    row.appendChild(this._grip(entity, item));
+    // No drag handle on a completed item. Dragging one used to look like it worked and
+    // then snap back: `todo/item/move` changes position, not status, so the next render
+    // put the item straight back under "done". Dropping it on another lane was worse —
+    // it arrived there quietly un-completed. Tick it first, then move it.
+    if (item.status !== "completed") row.appendChild(this._grip(entity, item));
     if (!editing) return row;
 
     const wrap = el("div", { class: "item-wrap", "data-uid": item.uid },

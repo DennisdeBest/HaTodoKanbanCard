@@ -132,6 +132,19 @@ describe("controls", () => {
     assert.equal(calls.length, before);
   });
 
+  test("a completed item has no drag handle", async () => {
+    // Moving a done item cannot do anything useful: a move changes position, not
+    // status, so it would snap back under "done" on the next render.
+    const { $$ } = fixture();
+    await tick();
+    const lane = $$(".lane")[1];
+    click(lane.querySelector(".link"));                    // reveal the done section
+    const doneRow = lane.querySelector(".done-items > [data-uid]");
+    assert.ok(doneRow, "expected a completed row");
+    assert.equal(doneRow.querySelector(".grip"), null);
+    assert.ok(lane.querySelector(".items > [data-uid] .grip"), "open items keep theirs");
+  });
+
   test("clear removes the completed items", async () => {
     const { $$, calls } = fixture();
     await tick();

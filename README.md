@@ -136,11 +136,19 @@ into one when they will not. Nothing to configure, and no separate mobile layout
 Every colour is a Home Assistant CSS variable, so the card follows whatever theme is
 active rather than shipping a palette of its own.
 
-> **If the lanes will not sit side by side**, the card is not the thing constraining
-> them — a **sections** view is. Each section column is capped at about 500 px, so raise
-> the view's `max_columns` and give the section a matching `column_span`
-> (`max_columns: 3` and `column_span: 3` for a three-lane board). `min_lane_width` sets
-> the point at which lanes wrap; lower it to fit more across.
+> **If the lanes will not sit side by side**, the card is almost never the thing
+> constraining them — the view is. A **sections** view grants columns by window width,
+> `max(1, floor((width - padding + gap) / (column_min_width + gap)))`, then clamps that
+> to the view's `max_columns`, and clamps a section's `column_span` to the result. With
+> the stock 320 px minimum and 32 px gap, three columns need about 1050 px of viewport,
+> and each column is capped at 500 px.
+>
+> So for a three-lane board in a sections view, set the view's `max_columns: 3` **and**
+> the section's `column_span: 3` — one without the other does nothing. Two columns
+> (≈1030 px) is already enough room for three lanes. If you want the board to own the
+> whole screen regardless, use a `panel` view instead, which hands its first card the
+> entire view. `min_lane_width` is the card's own knob: lower it to pack more lanes into
+> whatever width the card ends up with.
 
 ## Try it without Home Assistant
 
@@ -158,7 +166,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 58 assertions in jsdom
+npm test        # 59 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 ```
@@ -194,6 +202,9 @@ Re-run it after a visual change and commit whatever moved.
 - Dragging is pointer-events based and starts from the grip handle only, so the rest of
   the row keeps scrolling normally on a touchscreen. Every action a drag can perform is
   also in the item editor, for when a drag is not practical.
+- **Completed items have no drag handle.** A move changes an item's position, not its
+  status, so dragging a done item out of the "done" section only ever snapped back.
+  Tick it first, then move it.
 - **Holding a dragged item near the top or bottom of the screen scrolls the page**, so a
   lane below the fold is reachable on a phone. The grip sets `touch-action: none` — which
   is what stops the browser scrolling instead of dragging — so the card has to do that
