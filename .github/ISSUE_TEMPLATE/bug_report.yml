@@ -1,0 +1,64 @@
+name: Bug report
+description: Something the card does wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The three things that make a card bug quickly
+        fixable are the **version**, the **card configuration**, and whether it happens
+        on a phone or a desktop — dragging and the keyboard behave differently on each.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Card version
+      description: HACS shows it, or look for `TODO-KANBAN-CARD` in the browser console.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.8.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      multiple: true
+      options:
+        - Desktop browser
+        - Phone or tablet browser
+        - Home Assistant companion app
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Card configuration
+      description: >-
+        The YAML for the card — "Show code editor" in the card editor. Entity names are
+        fine to redact.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console errors
+      description: Anything red in the developer console, if there is anything.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots or a screen recording help a great deal for a layout or drag problem.

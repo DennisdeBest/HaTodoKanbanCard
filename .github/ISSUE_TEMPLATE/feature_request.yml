@@ -1,0 +1,21 @@
+name: Idea
+description: Something the card could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >-
+        The situation rather than the solution, if you can — it often turns out there is
+        a simpler way to get there.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today

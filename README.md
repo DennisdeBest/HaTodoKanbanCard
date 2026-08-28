@@ -1,5 +1,11 @@
 # Todo Kanban Card
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=DennisdeBest&repository=HaTodoKanbanCard&category=plugin)
+
+[![HACS custom](https://img.shields.io/badge/HACS-custom-41BDF5.svg)](https://hacs.xyz)
+[![Latest release](https://img.shields.io/github/v/release/DennisdeBest/HaTodoKanbanCard)](https://github.com/DennisdeBest/HaTodoKanbanCard/releases)
+[![Licence](https://img.shields.io/github/license/DennisdeBest/HaTodoKanbanCard)](LICENSE)
+
 A kanban board over Home Assistant's `todo` entities. Several lists side by side, and
 **you can drag an item from one list to another** — which is the part Home Assistant
 cannot do on its own.
@@ -9,12 +15,12 @@ card has no control for it. So an item that landed on the wrong list stays there
 gets deleted and retyped. This card fixes that, and arranges any number of lists as
 lanes while it is at it.
 
-![The shopping board](docs/shopping.png)
+![The shopping board](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/shopping.png)
 
 **Moving an item between lists is the whole point.** Drag by the handle on the right of
 a row — to another position, or to another lane:
 
-![Dragging an item from one list to another](docs/drag.gif)
+![Dragging an item from one list to another](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/drag.gif)
 
 ## What it does
 
@@ -31,7 +37,7 @@ a row — to another position, or to another lane:
 Tap a row to edit it in place — rename, due date, note, delete, and a **Move to** row
 that does the same job as a drag for when a drag is not practical:
 
-![The item editor](docs/editor.png)
+![The item editor](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/editor.png)
 
 It works with any `todo` provider — Local To-do, CalDAV, Google Tasks, Shopping List —
 though moving an item needs the source list to support deleting and the target to
@@ -63,7 +69,7 @@ Bump the `?v=` whenever you replace the file, or browsers will keep the old copy
 lists, what each is called, an icon and a colour for each, and the card-wide options.
 Lists can be reordered and removed there too — no YAML needed.
 
-![The visual editor](docs/editor-visual.png)
+![The visual editor](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/editor-visual.png)
 
 The pickers are Home Assistant's own, so the entity list is filtered to your `todo`
 entities, the icon field previews as you type, and the colours are the theme palette.
@@ -127,12 +133,12 @@ worked examples are in [`examples/`](examples/):
 
 A project board — lanes pinned open, and nothing typed straight into Done:
 
-![Backlog, Doing and Done](docs/project-board.png)
+![Backlog, Doing and Done](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/project-board.png)
 
 Chores by room — completed items hidden, and `min_lane_width` turned down so five lanes
 fit across:
 
-![One lane per room](docs/chores.png)
+![One lane per room](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/chores.png)
 
 ### On a phone, and in the dark
 
@@ -140,8 +146,8 @@ Lanes are laid out with `auto-fit`, so they use as many columns as will fit and 
 into one when they will not. Nothing to configure, and no separate mobile layout:
 
 <p>
-  <img src="docs/mobile.png" alt="The same board stacked on a phone" width="290">
-  <img src="docs/shopping-dark.png" alt="The board in a dark theme" width="560">
+  <img src="https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/mobile.png" alt="The same board stacked on a phone" width="290">
+  <img src="https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/shopping-dark.png" alt="The board in a dark theme" width="560">
 </p>
 
 Every colour is a Home Assistant CSS variable, so the card follows whatever theme is
@@ -264,7 +270,16 @@ looking fine.
 - No horizontal autoscroll while dragging. Lanes wrap rather than overflow, so there is
   usually nothing to scroll sideways to.
 
-Issues and pull requests welcome.
+## Found a problem?
+
+**Please open an issue** — [bug report](https://github.com/DennisdeBest/HaTodoKanbanCard/issues/new?template=bug_report.yml)
+or [an idea](https://github.com/DennisdeBest/HaTodoKanbanCard/issues/new?template=feature_request.yml).
+The card version, your card YAML and whether it happened on a phone or a desktop are the
+three things that make a report quickly actionable; dragging and the keyboard behave
+differently on each.
+
+Pull requests welcome too. `npm test` before opening one, and `npm run demo` for
+anything involving a pointer.
 
 ## Licence
 
