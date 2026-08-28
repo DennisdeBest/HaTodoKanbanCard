@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.0
+
+- **A visual editor.** Adding the card from the picker now opens a proper form instead
+  of a YAML box: choose the lists, name them, give each an icon and a colour, and
+  reorder or remove them. It is built on Home Assistant's own `ha-form`, so the entity,
+  icon and colour pickers are the real ones — themed, translated and behaving as they do
+  everywhere else.
+  It never emits a config the card would reject: a list is only added once one has
+  actually been picked, and the last one cannot be removed. Per-list overrides
+  (`hide_add`, `hide_completed`, `default_collapsed`) remain YAML-only and are left
+  untouched if you have set them.
+- **Lane colours accept Home Assistant palette names.** `color: red` now resolves to
+  `var(--red-color)` and follows the theme, using the same mapping the core cards use.
+  Raw CSS (`#9c27b0`, `var(--error-color)`) still passes straight through, so existing
+  configurations are unaffected.
+- **A card added from the picker starts with your actual lists.** `getStubConfig` reads
+  the first few `todo` entities off the instance rather than guessing at
+  `todo.shopping`.
+
 ## 1.1.0
 
 Four fixes from a month of the card being used in anger, three of them on a phone.

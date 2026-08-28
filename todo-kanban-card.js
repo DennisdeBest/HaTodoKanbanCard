@@ -20,10 +20,28 @@
  * MIT licensed. See README.md for the full config reference and more examples.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0-beta.1";
 const STORE = "todo-kanban.collapsed.";
 
 const DEFAULT_ICON = "mdi:format-list-checks";
+
+/*
+ * Home Assistant's own colour palette, so `color: red` works in a lane and follows the
+ * theme, while `#9c27b0` and `var(--error-color)` still pass straight through. Same
+ * mapping the core cards use: a known name becomes `var(--<name>-color)`, anything else
+ * is handed to CSS untouched.
+ */
+const HA_COLORS = new Set([
+  "primary", "accent", "red", "pink", "purple", "deep-purple", "indigo", "blue",
+  "light-blue", "cyan", "teal", "green", "light-green", "lime", "yellow", "amber",
+  "orange", "deep-orange", "brown", "light-grey", "grey", "dark-grey", "blue-grey",
+  "black", "white", "primary-text", "secondary-text", "disabled",
+]);
+
+function computeCssColor(value) {
+  if (!value || typeof value !== "string") return value;
+  return HA_COLORS.has(value) ? `var(--${value}-color)` : value;
+}
 
 const DEFAULTS = {
   title: undefined,
@@ -103,8 +121,17 @@ class TodoKanbanCard extends HTMLElement {
     this._autoScroll = this._autoScroll.bind(this);
   }
 
-  static getStubConfig() {
-    return { lanes: [{ entity: "todo.shopping" }] };
+  static getConfigElement() {
+    return document.createElement("todo-kanban-card-editor");
+  }
+
+  // What the card picker drops in. Real lists if this instance has any, so the card is
+  // useful the moment it is added rather than showing an error about todo.shopping.
+  static getStubConfig(hass) {
+    const todos = Object.keys((hass && hass.states) || {})
+      .filter((id) => id.startsWith("todo."))
+      .slice(0, 3);
+    return { lanes: (todos.length ? todos : ["todo.shopping"]).map((entity) => ({ entity })) };
   }
 
   setConfig(config) {
@@ -641,7 +668,7 @@ class TodoKanbanCard extends HTMLElement {
   _buildLane(lane) {
     const entity = lane.entity;
     const laneEl = el("section", { class: "lane", "data-lane": entity });
-    if (lane.color) laneEl.style.setProperty("--lane-accent", lane.color);
+    if (lane.color) laneEl.style.setProperty("--lane-accent", computeCssColor(lane.color));
 
     const head = el("header", {
       class: "lane-head",
@@ -991,6 +1018,277 @@ ha-card { padding: 8px 8px 12px; }
 .done-head { display: flex; align-items: center; padding: 2px 4px; }
 .done-items { opacity: 0.75; }
 `;
+
+/*
+ * The visual editor — what you get when you add the card from the picker rather than
+ * writing YAML. Pick the lists, name them, give them an icon and a colour.
+ *
+ * Built on Home Assistant's own `<ha-form>`, so the entity picker, icon picker and
+ * colour picker are the real ones: themed, translated, and behaving the way they do
+ * everywhere else. Nothing here is imported — those elements are already defined in a
+ * dashboard, which is the only place this element is ever created.
+ *
+ * Two rules it follows, both learned the hard way in the card itself:
+ *
+ * * **The forms are built once and only their `.data` is updated.** Rebuilding them on
+ *   every keystroke would take focus out of the field being typed into.
+ * * **It never emits an invalid config.** A lane with no entity would throw in
+ *   `setConfig` and break the live preview, so a lane is only appended once a list has
+ *   actually been chosen, and the last one cannot be removed.
+ *
+ * Anything the editor does not cover — per-lane `hide_add`, `hide_completed` and
+ * `default_collapsed` overrides — stays available in YAML and is left untouched here.
+ */
+const EDITOR_LABELS = {
+  title: "Title",
+  default_collapsed: "Folding",
+  hide_completed: "Hide completed",
+  hide_add: "Hide the add box",
+  min_lane_width: "Minimum list width",
+  entity: "List",
+  icon: "Icon",
+  color: "Colour",
+  add: "Add a list",
+};
+
+const CARD_SCHEMA = [
+  { name: "title", selector: { text: {} } },
+  {
+    name: "default_collapsed",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: [
+          { value: "auto", label: "Automatic — fold a list when it is empty" },
+          { value: "false", label: "Always open" },
+          { value: "true", label: "Always folded" },
+        ],
+      },
+    },
+  },
+  {
+    name: "",
+    type: "grid",
+    schema: [
+      { name: "hide_completed", selector: { boolean: {} } },
+      { name: "hide_add", selector: { boolean: {} } },
+    ],
+  },
+  {
+    name: "min_lane_width",
+    selector: { number: { min: 120, max: 600, step: 10, mode: "box", unit_of_measurement: "px" } },
+  },
+];
+
+const LANE_SCHEMA = [
+  { name: "entity", required: true, selector: { entity: { domain: "todo" } } },
+  {
+    name: "",
+    type: "grid",
+    schema: [
+      { name: "title", selector: { text: {} } },
+      { name: "icon", selector: { icon: {} } },
+    ],
+  },
+  { name: "color", selector: { ui_color: { include_none: true, default_color: "none" } } },
+];
+
+const ADD_SCHEMA = [{ name: "add", selector: { entity: { domain: "todo" } } }];
+
+class TodoKanbanCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._config = { lanes: [] };
+    this._built = false;
+  }
+
+  setConfig(config) {
+    this._config = { ...config, lanes: [...((config && config.lanes) || [])] };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  get hass() {
+    return this._hass;
+  }
+
+  _emit(config) {
+    this._config = config;
+    this._render();
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  // `select` hands back strings, and `default_collapsed` is auto | true | false.
+  _cardData() {
+    const c = this._config;
+    return {
+      title: c.title ?? "",
+      default_collapsed: String(c.default_collapsed ?? "auto"),
+      hide_completed: !!c.hide_completed,
+      hide_add: !!c.hide_add,
+      min_lane_width: c.min_lane_width ?? 270,
+    };
+  }
+
+  _cardChanged(ev) {
+    ev.stopPropagation();
+    const v = ev.detail.value;
+    const next = { ...this._config };
+
+    if (v.title) next.title = v.title; else delete next.title;
+
+    const fold = v.default_collapsed;
+    if (fold === "auto" || fold === undefined) delete next.default_collapsed;
+    else next.default_collapsed = fold === "true";
+
+    if (v.hide_completed) next.hide_completed = true; else delete next.hide_completed;
+    if (v.hide_add) next.hide_add = true; else delete next.hide_add;
+
+    const width = Number(v.min_lane_width);
+    if (width && width !== 270) next.min_lane_width = width; else delete next.min_lane_width;
+
+    this._emit(next);
+  }
+
+  _laneChanged(index, ev) {
+    ev.stopPropagation();
+    const v = ev.detail.value;
+    if (!v.entity) return;                       // never write a lane with no list
+    const lane = { ...this._config.lanes[index], entity: v.entity };
+    for (const key of ["title", "icon", "color"]) {
+      if (v[key]) lane[key] = v[key]; else delete lane[key];
+    }
+    const lanes = [...this._config.lanes];
+    lanes[index] = lane;
+    this._emit({ ...this._config, lanes });
+  }
+
+  _addLane(ev) {
+    ev.stopPropagation();
+    const entity = ev.detail.value && ev.detail.value.add;
+    if (!entity) return;
+    this._emit({ ...this._config, lanes: [...this._config.lanes, { entity }] });
+  }
+
+  _removeLane(index) {
+    if (this._config.lanes.length <= 1) return;  // a board needs at least one list
+    const lanes = this._config.lanes.filter((_, i) => i !== index);
+    this._emit({ ...this._config, lanes });
+  }
+
+  _moveLane(index, delta) {
+    const to = index + delta;
+    const lanes = [...this._config.lanes];
+    if (to < 0 || to >= lanes.length) return;
+    [lanes[index], lanes[to]] = [lanes[to], lanes[index]];
+    this._emit({ ...this._config, lanes });
+  }
+
+  _form(schema, data, onChange) {
+    const form = document.createElement("ha-form");
+    form.schema = schema;
+    form.computeLabel = (field) => EDITOR_LABELS[field.name] || field.name;
+    form.addEventListener("value-changed", onChange);
+    form.hass = this._hass;
+    form.data = data;
+    return form;
+  }
+
+  _button(icon, label, onClick, disabled) {
+    const b = el("button", { class: "tool", title: label, "aria-label": label, onclick: onClick },
+      [el("ha-icon", { icon })]);
+    if (disabled) b.setAttribute("disabled", "");
+    return b;
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+    const lanes = this._config.lanes || [];
+
+    // Rebuild only when the number of lanes changes; otherwise refresh the existing
+    // forms in place so the field being typed into keeps focus.
+    if (this._built && this._laneCount === lanes.length) {
+      this._cardForm.hass = this._hass;
+      this._cardForm.data = this._cardData();
+      this._laneForms.forEach((form, i) => {
+        form.hass = this._hass;
+        form.data = { ...lanes[i] };
+      });
+      this._addForm.hass = this._hass;
+      return;
+    }
+
+    const root = this.shadowRoot;
+    while (root.firstChild) root.firstChild.remove();
+    root.appendChild(el("style", { text: EDITOR_STYLE }));
+
+    this._cardForm = this._form(CARD_SCHEMA, this._cardData(), (ev) => this._cardChanged(ev));
+    root.appendChild(this._cardForm);
+
+    root.appendChild(el("h3", { class: "section-title", text: "Lists" }));
+    this._laneForms = [];
+    lanes.forEach((lane, i) => {
+      const form = this._form(LANE_SCHEMA, { ...lane }, (ev) => this._laneChanged(i, ev));
+      this._laneForms.push(form);
+      root.appendChild(el("div", { class: "lane-row" }, [
+        el("div", { class: "lane-tools" }, [
+          this._button("mdi:arrow-up", "Move up", () => this._moveLane(i, -1), i === 0),
+          this._button("mdi:arrow-down", "Move down", () => this._moveLane(i, 1), i === lanes.length - 1),
+          this._button("mdi:delete-outline", "Remove this list",
+            () => this._removeLane(i), lanes.length <= 1),
+        ]),
+        form,
+      ]));
+    });
+
+    this._addForm = this._form(ADD_SCHEMA, { add: "" }, (ev) => this._addLane(ev));
+    root.appendChild(el("div", { class: "add-row" }, [this._addForm]));
+    root.appendChild(el("p", { class: "hint", text:
+      "Per-list overrides for folding, the add box and completed items are available " +
+      "in YAML, and are left alone by this editor." }));
+
+    this._built = true;
+    this._laneCount = lanes.length;
+  }
+}
+
+const EDITOR_STYLE = `
+:host { display: flex; flex-direction: column; gap: 16px; }
+.section-title {
+  margin: 4px 0 -8px; font-size: 15px; font-weight: 500;
+  color: var(--primary-text-color);
+}
+.lane-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px; border-radius: 12px;
+  border: 1px solid var(--divider-color); background: var(--card-background-color);
+}
+.lane-row ha-form { flex: 1; min-width: 0; }
+.lane-tools { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+.tool {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--secondary-text-color);
+}
+.tool:hover:not([disabled]) { background: rgba(127,127,127,.14); color: var(--primary-text-color); }
+.tool[disabled] { opacity: .35; cursor: default; }
+.tool ha-icon { --mdc-icon-size: 20px; }
+.add-row { padding: 0 12px; }
+.hint { margin: 0; color: var(--secondary-text-color); font-size: 12px; line-height: 1.5; }
+`;
+
+if (!customElements.get("todo-kanban-card-editor")) {
+  customElements.define("todo-kanban-card-editor", TodoKanbanCardEditor);
+}
 
 if (!customElements.get("todo-kanban-card")) {
   customElements.define("todo-kanban-card", TodoKanbanCard);

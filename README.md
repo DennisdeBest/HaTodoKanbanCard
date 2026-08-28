@@ -59,7 +59,13 @@ Bump the `?v=` whenever you replace the file, or browsers will keep the old copy
 
 ## Configure
 
-The card has no visual editor yet — add it with **Manual card** and paste YAML.
+**There is a visual editor.** Add the card from the picker and you get list pickers, a
+name, an icon and a colour per list, plus the card-wide options — no YAML needed. Lists
+can be reordered and removed there too. Per-list overrides (`hide_add`,
+`hide_completed`, `default_collapsed`) are YAML-only, and the editor leaves them alone
+if you have set them.
+
+The YAML underneath, for anyone who prefers it:
 
 ```yaml
 type: custom:todo-kanban-card
@@ -97,7 +103,7 @@ lanes:
 | `entity` | string | **required** | A `todo.*` entity. |
 | `title` | string | friendly name | |
 | `icon` | string | `mdi:format-list-checks` | |
-| `color` | CSS colour | `var(--primary-color)` | Accents the header, count, checkbox and add button. Any CSS colour, including a theme variable. |
+| `color` | colour | `var(--primary-color)` | Accents the header, count, checkbox and add button. A Home Assistant palette name (`red`, `purple`, `deep-orange`, …), which follows the theme, or any CSS colour such as `#9c27b0` or `var(--error-color)`. |
 | `hide_completed`, `hide_add`, `default_collapsed` | | inherited | Override the card-wide setting for one lane. |
 
 Anything set on a lane wins over the same option on the card.
@@ -186,7 +192,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 59 assertions in jsdom
+npm test        # 77 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 ```
@@ -237,7 +243,8 @@ Re-run it after a visual change and commit whatever moved.
 
 ## Not there yet
 
-- No visual editor — YAML only.
+- The visual editor covers the lists, their names, icons and colours, and the card-wide
+  options — but not the per-list overrides. Those stay in YAML.
 - No per-item due **time**, only dates.
 - No filtering or sorting; lanes show the list in its own order.
 - No horizontal autoscroll while dragging. Lanes wrap rather than overflow, so there is
