@@ -706,3 +706,81 @@ describe("completing a tag as you type", () => {
     assert.equal(field.value, "Butter #dairy for the cake");
   });
 });
+
+describe("tags with spaces in them", () => {
+  const seeded = {
+    "todo.urgent": [
+      { uid: "q1", summary: 'Cake #"weekend baking" #veg', status: "needs_action" },
+      { uid: "q2", summary: "Call #12 plumber", status: "needs_action" },
+    ],
+    "todo.normal": [], "todo.later": [],
+  };
+  const on = { default_collapsed: false, enable_tags: true };
+
+  test("a quoted tag is one tag, not several", async () => {
+    const { $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    const row = $$(".lane")[0].querySelectorAll(".items > [data-uid]")[0];
+    assert.equal(row.querySelector(".summary").textContent, "Cake");
+    assert.deepEqual([...row.querySelectorAll(".tag")].map((t) => t.textContent),
+      ["weekend baking", "veg"]);
+  });
+
+  test("the chip shows the tag without its quotes", async () => {
+    const { $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    assert.equal($$(".lane")[0].querySelector(".tag").textContent, "weekend baking");
+  });
+
+  test("a colour can be given to a tag with spaces", async () => {
+    const { $$ } = fixture(
+      { ...on, tags: { "weekend baking": "amber" } }, structuredClone(seeded));
+    await tick();
+    assert.equal($$(".lane")[0].querySelector(".tag").style.getPropertyValue("--tag-color"),
+      "var(--amber-color)");
+  });
+
+  test("picking one from the editor writes it back quoted", async () => {
+    const { $, $$, calls } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelectorAll(".items > [data-uid] .label")[1]);   // the plumber item
+    const chips = [...$(".editor").querySelectorAll(".tag-chip")];
+    click(chips.find((c) => c.textContent === "weekend baking"));
+    assert.equal($(".editor input[type=text]").value, 'Call #12 plumber #"weekend baking"');
+  });
+
+  test("and toggling it off again removes the whole quoted tag", async () => {
+    const { $, $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    const chip = [...$(".editor").querySelectorAll(".tag-chip")]
+      .find((c) => c.textContent === "weekend baking");
+    click(chip);
+    assert.equal($(".editor input[type=text]").value, "Cake #veg");
+  });
+
+  test("completing works part-way through a quoted tag", async () => {
+    const { $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    const field = add.querySelector(".field");
+    field.value = 'Flour #"week';
+    field.setSelectionRange(field.value.length, field.value.length);
+    field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    const suggest = add.querySelector(".tag-suggest");
+    assert.deepEqual([...suggest.querySelectorAll(".tag-chip")].map((c) => c.textContent),
+      ["weekend baking"]);
+    click(suggest.querySelector(".tag-chip"));
+    assert.equal(field.value, 'Flour #"weekend baking" ');
+  });
+
+  test("the # button writes a spaced tag quoted too", async () => {
+    const { $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    add.querySelector(".field").value = "Flour";
+    click(add.querySelector(".tag-btn"));
+    click([...add.querySelectorAll(".tag-chip")].find((c) => c.textContent === "weekend baking"));
+    assert.equal(add.querySelector(".field").value, 'Flour #"weekend baking"');
+  });
+});

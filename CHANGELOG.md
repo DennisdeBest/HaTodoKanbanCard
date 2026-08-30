@@ -2,6 +2,12 @@
 
 ## 1.3.0
 
+- **Tags can contain spaces**, written in quotes after the hash: `Flour #"weekend
+  baking"`. Unquoted they would read back as several one-word tags.
+- **The source is split into modules under `src/`,** and `npm run build` bundles them
+  into the single file HACS installs. That file is still committed, still unminified and
+  still readable — the single file is forced by HACS, which downloads exactly one — but
+  it is no longer the thing you edit.
 - **Tags are off by default.** `enable_tags: true` switches them on, per card or per
   lane. A `#` in an item may well be there for another reason, and a card update should
   not quietly start eating it.

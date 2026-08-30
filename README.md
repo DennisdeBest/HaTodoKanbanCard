@@ -123,7 +123,11 @@ description — and no notion of a tag. So a tag lives in the item's own text:
 ```
 Milk #dairy
 #frozen Peas #veg
+Flour #"weekend baking"
 ```
+
+A tag with a space in it goes in quotes, straight after the `#`. Without them it would
+read back as several one-word tags.
 
 The card lifts the `#tags` out and shows them as chips next to the item, leaving *Milk*
 and *Peas* as the text. Give them colours if you want to:
@@ -252,15 +256,34 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 113 assertions in jsdom
+npm run build   # src/ -> todo-kanban-card.js
+npm test        # builds first, then 120 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)
 ```
 
-The card is a plain custom element — no build step, no dependencies, no lit. Edit
-`todo-kanban-card.js` and reload. The dev dependencies are only for testing and for
-taking the pictures; nothing is bundled into the card.
+The card is a plain custom element — no framework, no lit, and nothing of the toolchain
+ends up in what ships. The source lives in `src/`:
+
+```
+src/tags.js      the tag convention: written into item text, read back, completed
+src/dom.js       el(), the whole of the "framework"
+src/colors.js    Home Assistant's palette
+src/card.js      the board
+src/editor.js    the visual editor
+src/*.css        styles, bundled in at build time
+```
+
+`npm run build` bundles those into the single `todo-kanban-card.js` at the repo root,
+which is the file HACS installs and the file that is committed. **Do not edit it by
+hand** — the next build overwrites it.
+
+The single file is forced, not a preference: HACS downloads exactly the one file named
+in `hacs.json`, so a sibling `styles.css` would never be installed on anyone's instance
+and an `import` of one would 404 on every dashboard. The build is deliberately not
+minified — the point of a one-file card is that someone can read what they are about to
+run.
 
 `npm test` covers rendering, folding, every control, the item editor, adding several
 items in a row, the autoscroll decision and the drop arithmetic, plus the demo's mock

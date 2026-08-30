@@ -1,0 +1,23 @@
+/* Styles for the visual editor. Bundled into the card at build time. */
+:host { display: flex; flex-direction: column; gap: 16px; }
+.section-title {
+  margin: 4px 0 -8px; font-size: 15px; font-weight: 500;
+  color: var(--primary-text-color);
+}
+.lane-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px; border-radius: 12px;
+  border: 1px solid var(--divider-color); background: var(--card-background-color);
+}
+.lane-row ha-form { flex: 1; min-width: 0; }
+.lane-tools { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+.tool {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--secondary-text-color);
+}
+.tool:hover:not([disabled]) { background: rgba(127,127,127,.14); color: var(--primary-text-color); }
+.tool[disabled] { opacity: .35; cursor: default; }
+.tool ha-icon { --mdc-icon-size: 20px; }
+.add-row { padding: 0 12px; }
+.hint { margin: 0; color: var(--secondary-text-color); font-size: 12px; line-height: 1.5; }
