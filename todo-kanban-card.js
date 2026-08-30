@@ -87,7 +87,9 @@ const DEFAULTS = {
   default_collapsed: "auto",
   hide_completed: false,
   hide_add: false,
-  hide_tags: false,
+  // Off by default: plenty of people have a `#` in an item for reasons of their own,
+  // and a card update should not quietly start eating it.
+  enable_tags: false,
   min_lane_width: 270,
   // tag name -> colour. Any tag not listed here still shows, in a neutral chip.
   tags: {},
@@ -821,9 +823,9 @@ class TodoKanbanCard extends HTMLElement {
 
     const due = dueLabel(item.due);
     const lane = (this._config.lanes || []).find((l) => l.entity === entity) || {};
-    const parsed = this._opt(lane, "hide_tags")
-      ? { text: item.summary, tags: [] }
-      : splitTags(item.summary);
+    const parsed = this._opt(lane, "enable_tags")
+      ? splitTags(item.summary)
+      : { text: item.summary, tags: [] };
     const palette = this._config.tags || {};
 
     const label = el("div", {
@@ -885,7 +887,9 @@ class TodoKanbanCard extends HTMLElement {
     };
 
     const others = this._config.lanes.filter((l) => l.entity !== entity);
-    const known = this._knownTags();
+    const known = this._opt(
+      (this._config.lanes || []).find((l) => l.entity === entity) || {}, "enable_tags"
+    ) ? this._knownTags() : [];
     return el("div", { class: "editor" }, [
       name,
       el("div", { class: "row" }, [dueInput, desc]),
@@ -958,14 +962,25 @@ class TodoKanbanCard extends HTMLElement {
 
   _renderAdd(entity) {
     const key = `add.${entity}`;
+    const lane = (this._config.lanes || []).find((l) => l.entity === entity) || {};
     const input = el("input", {
       type: "text",
       class: "field",
       placeholder: "Add an item",
       value: this._drafts[entity] || "",
       "data-focus": key,
-      oninput: (ev) => { this._drafts[entity] = ev.target.value; },
-      onkeydown: (ev) => { if (ev.key === "Enter") submit(); },
+      oninput: (ev) => { this._drafts[entity] = ev.target.value; refresh(); },
+      onkeyup: () => refresh(),
+      onclick: () => refresh(),
+      onkeydown: (ev) => {
+        if (ev.key === "Enter") { submit(); return; }
+        // Tab takes the first suggestion. Enter is left alone — it adds the item, and
+        // quietly turning that into "accept a completion" would be a nasty surprise.
+        if (ev.key === "Tab" && !suggest.hidden) {
+          const first = suggest.querySelector(".tag-chip");
+          if (first) { ev.preventDefault(); first.click(); }
+        }
+      },
     });
     const submit = async () => {
       const text = input.value;
@@ -976,26 +991,85 @@ class TodoKanbanCard extends HTMLElement {
       await this._add(entity, text);
     };
     /*
-     * The tag suggestions. Built on demand rather than up front, because the add row is
-     * created once for the life of the card — that is what keeps the field focused
-     * between items — so it cannot rely on a re-render to refresh its contents.
+     * Tag suggestions, in two modes.
+     *
+     * The `#` button lists every tag in use, and a chip toggles it. Typing `#dai` into
+     * the field instead filters the same row down to what matches and completes the
+     * word you are part-way through — so a tag can be picked, typed, or half-typed and
+     * then picked.
+     *
+     * It is all built on demand rather than up front, because the add row is created
+     * once for the life of the card — that is what keeps the field focused between
+     * items — so it cannot rely on a re-render to refresh itself.
      */
     const suggest = el("div", { class: "tag-suggest", hidden: true });
-    const fillSuggest = () => {
+    let pinned = false;   // the button was pressed, so keep the full list showing
+
+    // The word the caret is sitting in, which is what a completion replaces.
+    const tokenAt = () => {
+      const value = input.value;
+      const caret = input.selectionStart ?? value.length;
+      const from = value.lastIndexOf(" ", Math.max(0, caret - 1)) + 1;
+      let to = value.indexOf(" ", caret);
+      if (to === -1) to = value.length;
+      return { from, to, text: value.slice(from, to) };
+    };
+
+    const complete = (tag) => {
+      const { from, to } = tokenAt();
+      const before = input.value.slice(0, from);
+      const after = input.value.slice(to);
+      input.value = `${before}#${tag}${after.startsWith(" ") ? "" : " "}${after}`;
+      const caret = (before + "#" + tag + " ").length;
+      input.setSelectionRange(caret, caret);
+      this._drafts[entity] = input.value;
+      input.focus();
+      refresh();
+    };
+
+    const refresh = () => {
+      if (!this._opt(lane, "enable_tags")) return;
       const known = this._knownTags();
+      const { text } = tokenAt();
+      const typing = text.startsWith("#");
+
+      if (typing) {
+        const query = text.slice(1).toLowerCase();
+        const already = splitTags(input.value).tags;
+        const matches = known.filter(
+          (t) => t.toLowerCase().startsWith(query) && (t.toLowerCase() !== query || !already.includes(t))
+        );
+        suggest.replaceChildren(...matches.map((tag) => {
+          const chip = el("button", {
+            class: "chip tag-chip",
+            onmousedown: (ev) => ev.preventDefault(),
+            onclick: () => complete(tag),
+          }, [tag]);
+          return chip;
+        }));
+        suggest.hidden = matches.length === 0;
+        return;
+      }
+
+      if (!pinned) {
+        suggest.hidden = true;
+        return;
+      }
       suggest.replaceChildren(
         ...(known.length
           ? known.map((tag) => this._tagChip(tag, input, (v) => { this._drafts[entity] = v; }))
           : [el("span", { class: "no-tags", text: "No tags yet — type #something into an item" })])
       );
+      suggest.hidden = false;
     };
+
     const tagButton = el("button", {
       class: "tag-btn",
       title: "Tags",
       onmousedown: (ev) => ev.preventDefault(),
       onclick: () => {
-        suggest.hidden = !suggest.hidden;
-        if (!suggest.hidden) fillSuggest();
+        pinned = !pinned;
+        refresh();
         input.focus();
       },
     }, [icon("mdi:pound")]);
@@ -1003,7 +1077,7 @@ class TodoKanbanCard extends HTMLElement {
     return el("div", { class: "add" }, [
       el("div", { class: "add-row" }, [
         input,
-        tagButton,
+        this._opt(lane, "enable_tags") ? tagButton : null,
         el("button", {
           class: "icon-btn",
           title: "Add",
@@ -1188,6 +1262,7 @@ const EDITOR_LABELS = {
   default_collapsed: "Folding",
   hide_completed: "Hide completed",
   hide_add: "Hide the add box",
+  enable_tags: "Treat #words in an item as tags",
   min_lane_width: "Minimum list width",
   entity: "List",
   icon: "Icon",
@@ -1472,6 +1547,10 @@ class TodoKanbanCardEditor extends HTMLElement {
         form.hass = this._hass;
         form.data = { ...tagRows[i] };
       });
+      if (this._tagsForm) {
+        this._tagsForm.hass = this._hass;
+        this._tagsForm.data = { enable_tags: !!this._config.enable_tags };
+      }
       if (this._addTagForm) this._addTagForm.hass = this._hass;
       return;
     }
@@ -1502,10 +1581,23 @@ class TodoKanbanCardEditor extends HTMLElement {
     this._addForm = this._form(ADD_SCHEMA, { add: "" }, (ev) => this._addLane(ev));
     root.appendChild(el("div", { class: "add-row" }, [this._addForm]));
 
-    root.appendChild(el("h3", { class: "section-title", text: "Tag colours" }));
+    root.appendChild(el("h3", { class: "section-title", text: "Tags" }));
     root.appendChild(el("p", { class: "hint", text:
-      "Write a tag straight into an item — \u201cMilk #dairy\u201d — and it shows as a chip. " +
-      "Give a tag a colour here; anything not listed still shows, in grey." }));
+      "Off by default, since a \u201c#\u201d in an item may well be there for another reason. " +
+      "Switched on, \u201cMilk #dairy\u201d shows as Milk with a chip, and the add box " +
+      "suggests tags you have already used." }));
+    this._tagsForm = this._form(
+      [{ name: "enable_tags", selector: { boolean: {} } }],
+      { enable_tags: !!this._config.enable_tags },
+      (ev) => {
+        ev.stopPropagation();
+        const next = { ...this._config };
+        if (ev.detail.value.enable_tags) next.enable_tags = true;
+        else delete next.enable_tags;
+        this._emit(next);
+      }
+    );
+    root.appendChild(this._tagsForm);
 
     this._tagForms = [];
     tagRows.forEach((row, i) => {

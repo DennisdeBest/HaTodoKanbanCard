@@ -439,7 +439,7 @@ describe("tags written into an item", () => {
   const chips = (row) => [...row.querySelectorAll(".tag")].map((c) => c.textContent);
 
   test("shows tags as chips and takes them out of the item's text", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(tagged));
     await tick();
     const rows = $$(".lane")[0].querySelectorAll(".items > [data-uid]");
     assert.equal(rows[0].querySelector(".summary").textContent, "Milk");
@@ -449,7 +449,7 @@ describe("tags written into an item", () => {
   });
 
   test("an untagged item is left alone", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(tagged));
     await tick();
     const row = $$(".lane")[0].querySelectorAll(".items > [data-uid]")[2];
     assert.equal(row.querySelector(".summary").textContent, "Nothing tagged here");
@@ -458,7 +458,7 @@ describe("tags written into an item", () => {
 
   test("a configured tag gets its colour, an unconfigured one still shows", async () => {
     const { $$ } = fixture(
-      { default_collapsed: false, tags: { dairy: "blue", veg: "#4caf50" } },
+      { default_collapsed: false, enable_tags: true, tags: { dairy: "blue", veg: "#4caf50" } },
       structuredClone(tagged)
     );
     await tick();
@@ -470,9 +470,9 @@ describe("tags written into an item", () => {
     assert.equal(second[1].style.getPropertyValue("--tag-color"), "#4caf50");
   });
 
-  test("hide_tags leaves the raw text alone", async () => {
+  test("tags are off unless asked for, leaving the raw text alone", async () => {
     const { $$ } = fixture(
-      { default_collapsed: false, hide_tags: true },
+      { default_collapsed: false, enable_tags: false },
       structuredClone(tagged)
     );
     await tick();
@@ -482,14 +482,14 @@ describe("tags written into an item", () => {
   });
 
   test("the editor still shows the full text, tags included", async () => {
-    const { $, $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    const { $, $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(tagged));
     await tick();
     click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
     assert.equal($(".editor input[type=text]").value, "Milk #dairy");
   });
 
   test("renaming through the editor keeps whatever tags were typed", async () => {
-    const { $, $$, calls } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    const { $, $$, calls } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(tagged));
     await tick();
     click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
     $(".editor input[type=text]").value = "Oat milk #dairy #new";
@@ -512,13 +512,13 @@ describe("picking tags instead of typing them", () => {
   };
 
   test("suggestions come from tags in use plus tags given a colour", async () => {
-    const { card } = fixture({ tags: { pantry: "brown" } }, structuredClone(seeded));
+    const { card } = fixture({ enable_tags: true, tags: { pantry: "brown" } }, structuredClone(seeded));
     await tick();
     assert.deepEqual(card._knownTags(), ["dairy", "frozen", "pantry", "veg"]);
   });
 
   test("the add box has a tag button that reveals the suggestions", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     const add = $$(".lane")[0].querySelector(".add");
     const suggest = add.querySelector(".tag-suggest");
@@ -530,7 +530,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("clicking a suggestion writes the tag into the field", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     const add = $$(".lane")[0].querySelector(".add");
     const field = add.querySelector(".field");
@@ -541,7 +541,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("clicking it again takes the tag back out", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     const add = $$(".lane")[0].querySelector(".add");
     const field = add.querySelector(".field");
@@ -554,7 +554,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("an added item carries the picked tag through to the service call", async () => {
-    const { $$, calls } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $$, calls } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     const add = $$(".lane")[0].querySelector(".add");
     input(add.querySelector(".field"), "Butter");
@@ -567,7 +567,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("the tag buttons never steal focus from the field", async () => {
-    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     const add = $$(".lane")[0].querySelector(".add");
     click(add.querySelector(".tag-btn"));
@@ -579,7 +579,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("the item editor offers the same chips, showing which are already on", async () => {
-    const { $, $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $, $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
     const chips = [...$(".editor").querySelectorAll(".tag-chip")];
@@ -589,7 +589,7 @@ describe("picking tags instead of typing them", () => {
   });
 
   test("toggling a chip in the editor edits the name, and saving keeps it", async () => {
-    const { $, $$, calls } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    const { $, $$, calls } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
     await tick();
     click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
     click([...$(".editor").querySelectorAll(".tag-chip")][1]);   // frozen
@@ -597,5 +597,112 @@ describe("picking tags instead of typing them", () => {
     click([...$(".editor").querySelectorAll(".actions .chip")].at(-1));
     await tick();
     assert.equal(calls.at(-1)[1].rename, "Milk #dairy #frozen");
+  });
+});
+
+describe("tags are opt-in", () => {
+  const withHash = {
+    "todo.urgent": [{ uid: "h1", summary: "Call #12 plumber #home", status: "needs_action" }],
+    "todo.normal": [], "todo.later": [],
+  };
+
+  test("by default a # in an item is just text", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(withHash));
+    await tick();
+    const row = $$(".lane")[0].querySelector(".items > [data-uid]");
+    assert.equal(row.querySelector(".summary").textContent, "Call #12 plumber #home");
+    assert.equal(row.querySelectorAll(".tag").length, 0);
+  });
+
+  test("and the tag button is not offered", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(withHash));
+    await tick();
+    assert.equal($$(".lane")[0].querySelectorAll(".add .tag-btn").length, 0);
+  });
+
+  test("enable_tags turns it on, and can be set for one lane only", async () => {
+    const { $$ } = fixture({
+      default_collapsed: false,
+      lanes: [{ entity: "todo.urgent", enable_tags: true }, { entity: "todo.normal" }, { entity: "todo.later" }],
+    }, structuredClone(withHash));
+    await tick();
+    assert.equal($$(".lane")[0].querySelectorAll(".add .tag-btn").length, 1);
+    assert.equal($$(".lane")[1].querySelectorAll(".add .tag-btn").length, 0);
+    assert.equal($$(".lane")[0].querySelector(".summary").textContent, "Call plumber");
+  });
+});
+
+describe("completing a tag as you type", () => {
+  const seeded = {
+    "todo.urgent": [{ uid: "c1", summary: "Milk #dairy", status: "needs_action" }],
+    "todo.normal": [{ uid: "c2", summary: "Peas #frozen #veg #dessert", status: "needs_action" }],
+    "todo.later": [],
+  };
+  const setup = async () => {
+    const f = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(seeded));
+    await tick();
+    const add = f.$$(".lane")[0].querySelector(".add");
+    return { ...f, add, field: add.querySelector(".field"), suggest: add.querySelector(".tag-suggest") };
+  };
+  const type = (field, value) => {
+    field.value = value;
+    field.setSelectionRange(value.length, value.length);
+    field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  };
+  const shown = (suggest) => [...suggest.querySelectorAll(".tag-chip")].map((c) => c.textContent);
+
+  test("typing # offers everything, and narrows as you go", async () => {
+    const { field, suggest } = await setup();
+    type(field, "Butter #");
+    assert.deepEqual(shown(suggest), ["dairy", "dessert", "frozen", "veg"]);
+    type(field, "Butter #d");
+    assert.deepEqual(shown(suggest), ["dairy", "dessert"]);
+    type(field, "Butter #dai");
+    assert.deepEqual(shown(suggest), ["dairy"]);
+  });
+
+  test("no matches means no suggestions in the way", async () => {
+    const { field, suggest } = await setup();
+    type(field, "Butter #zzz");
+    assert.ok(suggest.hidden);
+  });
+
+  test("plain text shows nothing", async () => {
+    const { field, suggest } = await setup();
+    type(field, "Butter");
+    assert.ok(suggest.hidden);
+  });
+
+  test("clicking a match completes the word being typed", async () => {
+    const { field, suggest } = await setup();
+    type(field, "Butter #dai");
+    click(suggest.querySelector(".tag-chip"));
+    assert.equal(field.value, "Butter #dairy ");
+  });
+
+  test("tab takes the first match", async () => {
+    const { field, suggest } = await setup();
+    type(field, "Butter #d");
+    field.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    assert.equal(field.value, "Butter #dairy ");
+    assert.ok(suggest.hidden || shown(suggest).length >= 0);
+  });
+
+  test("enter still adds the item rather than accepting a completion", async () => {
+    const { field, calls } = await setup();
+    type(field, "Butter #dai");
+    field.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await tick();
+    assert.equal(calls.at(-1)[0], "todo.add_item");
+    assert.equal(calls.at(-1)[1].item, "Butter #dai");
+  });
+
+  test("completing mid-sentence keeps what came after", async () => {
+    const { field, suggest } = await setup();
+    field.value = "Butter #dai for the cake";
+    field.setSelectionRange(11, 11);
+    field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    click(suggest.querySelector(".tag-chip"));
+    assert.equal(field.value, "Butter #dairy for the cake");
   });
 });

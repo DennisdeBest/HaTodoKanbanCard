@@ -2,6 +2,9 @@
 
 ## 1.3.0
 
+- **Tags are off by default.** `enable_tags: true` switches them on, per card or per
+  lane. A `#` in an item may well be there for another reason, and a card update should
+  not quietly start eating it.
 - **Tags.** Write one into an item — `Milk #dairy` — and the card shows *Milk* with a
   `dairy` chip beside it. Colour them with a `tags:` map; any tag you have not coloured
   still shows, in a neutral chip, so tagging something never means visiting the editor
@@ -12,7 +15,11 @@
   description, and nothing else. Keeping them in the summary means they survive editing
   from the companion app or the core to-do card, they are visible to anyone not using
   this card, and uninstalling it leaves `Milk #dairy` rather than stray metadata.
-- **Tags can be picked rather than typed.** The `#` button beside the add box lists every
+- **Tags complete as you type.** `#dai` narrows the suggestions to what matches; click
+  one or press Tab for the first, and the word completes. Enter is deliberately left
+  alone — it adds the item, and turning that into "accept a completion" would be a nasty
+  surprise mid-list.
+- **Or pick one without typing.** The `#` button beside the add box lists every
   tag already in use; clicking one drops it into what you are typing. The same chips are
   in an item's editor, lit for the tags it already has, so one tap adds or removes a tag.
   The card takes the list from the lanes it already subscribes to, so suggestions cost no

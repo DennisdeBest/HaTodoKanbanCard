@@ -47,6 +47,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CONFIG = {
   title: "Shopping",
+  enable_tags: true,
   tags: { spices: "orange", fresh: "green", pets: "purple" },
   lanes: [
     { entity: "todo.shopping_urgent", title: "Urgent", icon: "mdi:alert-octagon", color: "red" },

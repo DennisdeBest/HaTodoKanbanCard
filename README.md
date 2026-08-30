@@ -107,11 +107,15 @@ lanes:
 | `default_collapsed` | `auto` \| `true` \| `false` | `auto` | `auto` folds a lane that is empty and opens one that is not. `true` / `false` pin it. |
 | `hide_completed` | boolean | `false` | Drop the "done" section entirely. |
 | `hide_add` | boolean | `false` | Drop the "add an item" box. |
-| `hide_tags` | boolean | `false` | Stop parsing `#tags` out of item text. |
+| `enable_tags` | boolean | `false` | Treat `#words` in an item as tags. Off by default. |
 | `tags` | map | – | Tag name to colour, e.g. `dairy: blue`. Palette names or CSS. |
 | `min_lane_width` | number | `270` | Pixels. Lanes wrap to a new row below this width. |
 
 ### Tags
+
+**Off by default** — a `#` in an item may well be there for another reason, and a card
+update should not start eating it. Switch it on with `enable_tags: true`, on the card or
+one lane.
 
 Home Assistant's to-do items have four fields — summary, status, due date and
 description — and no notion of a tag. So a tag lives in the item's own text:
@@ -126,6 +130,7 @@ and *Peas* as the text. Give them colours if you want to:
 
 ```yaml
 type: custom:todo-kanban-card
+enable_tags: true
 tags:
   dairy: blue
   spices: orange
@@ -136,11 +141,12 @@ lanes: [...]
 Any tag not listed still shows, in a neutral chip — tagging something never requires a
 trip to the editor first.
 
-**You do not have to type them, either.** The `#` button beside the add box shows every
-tag already in use, and clicking one drops it into what you are typing. The same chips
-appear in an item's editor, lit up for the tags it already carries, so a tag can be added
-or removed with one tap. The card knows those tags from the lists it already subscribes
-to, so the suggestions cost nothing.
+**You do not have to type them in full, either.** Start typing `#dai` and the box
+suggests matching tags — click one, or press <kbd>Tab</kbd> for the first, and the word
+completes. <kbd>Enter</kbd> is left alone: it adds the item, as it always did. The `#`
+button beside the box lists every tag in use if you would rather browse than type, and
+the same chips appear in an item's editor, lit for the tags it already carries. The card
+takes them from the lists it already subscribes to, so suggestions cost nothing.
 
 The **visual editor** has a matching section for giving tags their colours, which
 suggests the tags already written on your items.
@@ -148,7 +154,7 @@ suggests the tags already written on your items.
 Keeping tags in the summary rather than the description is deliberate: they survive being
 edited from the companion app or the core to-do card, anyone not using this card still
 sees them, and uninstalling it leaves `Milk #dairy` rather than a field of stray
-metadata. Set `hide_tags: true` on the card or a lane to switch the parsing off.
+metadata.
 
 ### Lane options
 
@@ -158,7 +164,7 @@ metadata. Set `hide_tags: true` on the card or a lane to switch the parsing off.
 | `title` | string | friendly name | |
 | `icon` | string | `mdi:format-list-checks` | |
 | `color` | colour | `var(--primary-color)` | Accents the header, count, checkbox and add button. A Home Assistant palette name (`red`, `purple`, `deep-orange`, …), which follows the theme, or any CSS colour such as `#9c27b0` or `var(--error-color)`. |
-| `hide_completed`, `hide_add`, `hide_tags`, `default_collapsed` | | inherited | Override the card-wide setting for one lane. |
+| `hide_completed`, `hide_add`, `enable_tags`, `default_collapsed` | | inherited | Override the card-wide setting for one lane. |
 
 Anything set on a lane wins over the same option on the card.
 
@@ -246,7 +252,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 103 assertions in jsdom
+npm test        # 113 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)
