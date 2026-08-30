@@ -2,7 +2,7 @@ import { test, describe, before, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { setupDom, makeHass, tick, click, input } from "./helpers.mjs";
 
-setupDom();
+const dom = setupDom();
 await import("../todo-kanban-card.js");
 
 const LANES = [
@@ -501,5 +501,101 @@ describe("tags written into an item", () => {
   test("rejects a tags value that is not a map", () => {
     assert.throws(() => document.createElement("todo-kanban-card")
       .setConfig({ lanes: [{ entity: "todo.a" }], tags: ["dairy"] }));
+  });
+});
+
+describe("picking tags instead of typing them", () => {
+  const seeded = {
+    "todo.urgent": [{ uid: "p1", summary: "Milk #dairy", status: "needs_action" }],
+    "todo.normal": [{ uid: "p2", summary: "Peas #frozen #veg", status: "needs_action" }],
+    "todo.later": [],
+  };
+
+  test("suggestions come from tags in use plus tags given a colour", async () => {
+    const { card } = fixture({ tags: { pantry: "brown" } }, structuredClone(seeded));
+    await tick();
+    assert.deepEqual(card._knownTags(), ["dairy", "frozen", "pantry", "veg"]);
+  });
+
+  test("the add box has a tag button that reveals the suggestions", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    const suggest = add.querySelector(".tag-suggest");
+    assert.ok(suggest.hidden, "starts out of the way");
+    click(add.querySelector(".tag-btn"));
+    assert.ok(!suggest.hidden);
+    assert.deepEqual([...suggest.querySelectorAll(".tag-chip")].map((c) => c.textContent),
+      ["dairy", "frozen", "veg"]);
+  });
+
+  test("clicking a suggestion writes the tag into the field", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    const field = add.querySelector(".field");
+    field.value = "Butter";
+    click(add.querySelector(".tag-btn"));
+    click(add.querySelectorAll(".tag-chip")[0]);
+    assert.equal(field.value, "Butter #dairy");
+  });
+
+  test("clicking it again takes the tag back out", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    const field = add.querySelector(".field");
+    field.value = "Butter";
+    click(add.querySelector(".tag-btn"));
+    const chip = add.querySelectorAll(".tag-chip")[0];
+    click(chip);
+    click(chip);
+    assert.equal(field.value, "Butter");
+  });
+
+  test("an added item carries the picked tag through to the service call", async () => {
+    const { $$, calls } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    input(add.querySelector(".field"), "Butter");
+    click(add.querySelector(".tag-btn"));
+    click(add.querySelectorAll(".tag-chip")[0]);
+    click(add.querySelector(".icon-btn"));
+    await tick();
+    assert.equal(calls.at(-1)[0], "todo.add_item");
+    assert.equal(calls.at(-1)[1].item, "Butter #dairy");
+  });
+
+  test("the tag buttons never steal focus from the field", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    const add = $$(".lane")[0].querySelector(".add");
+    click(add.querySelector(".tag-btn"));
+    for (const el of [add.querySelector(".tag-btn"), add.querySelector(".tag-chip")]) {
+      const ev = new dom.window.MouseEvent("mousedown", { bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+      assert.ok(ev.defaultPrevented, `${el.className} stole focus`);
+    }
+  });
+
+  test("the item editor offers the same chips, showing which are already on", async () => {
+    const { $, $$ } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    const chips = [...$(".editor").querySelectorAll(".tag-chip")];
+    assert.deepEqual(chips.map((c) => c.textContent), ["dairy", "frozen", "veg"]);
+    assert.ok(chips[0].classList.contains("on"), "dairy is on this item");
+    assert.ok(!chips[1].classList.contains("on"));
+  });
+
+  test("toggling a chip in the editor edits the name, and saving keeps it", async () => {
+    const { $, $$, calls } = fixture({ default_collapsed: false }, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    click([...$(".editor").querySelectorAll(".tag-chip")][1]);   // frozen
+    assert.equal($(".editor input[type=text]").value, "Milk #dairy #frozen");
+    click([...$(".editor").querySelectorAll(".actions .chip")].at(-1));
+    await tick();
+    assert.equal(calls.at(-1)[1].rename, "Milk #dairy #frozen");
   });
 });

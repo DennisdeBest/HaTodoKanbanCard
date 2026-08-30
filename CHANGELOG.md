@@ -12,8 +12,15 @@
   description, and nothing else. Keeping them in the summary means they survive editing
   from the companion app or the core to-do card, they are visible to anyone not using
   this card, and uninstalling it leaves `Milk #dairy` rather than stray metadata.
-- **The editor suggests tags you have already used.** It reads the configured lists and
-  offers what it finds, while still accepting a tag that does not exist yet.
+- **Tags can be picked rather than typed.** The `#` button beside the add box lists every
+  tag already in use; clicking one drops it into what you are typing. The same chips are
+  in an item's editor, lit for the tags it already has, so one tap adds or removes a tag.
+  The card takes the list from the lanes it already subscribes to, so suggestions cost no
+  extra round trip. Neither the button nor the chips take focus, so a phone keyboard
+  stays open throughout.
+- **The visual editor suggests tags you have already used** when giving them colours. It
+  reads the configured lists and offers what it finds, while still accepting a tag that
+  does not exist yet.
 
 ## 1.2.1
 

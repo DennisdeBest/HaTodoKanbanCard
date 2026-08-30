@@ -134,8 +134,16 @@ lanes: [...]
 ```
 
 Any tag not listed still shows, in a neutral chip — tagging something never requires a
-trip to the editor first. The **visual editor** has a tag section that suggests the tags
-already written on your items, so you do not have to remember how you spelled one.
+trip to the editor first.
+
+**You do not have to type them, either.** The `#` button beside the add box shows every
+tag already in use, and clicking one drops it into what you are typing. The same chips
+appear in an item's editor, lit up for the tags it already carries, so a tag can be added
+or removed with one tap. The card knows those tags from the lists it already subscribes
+to, so the suggestions cost nothing.
+
+The **visual editor** has a matching section for giving tags their colours, which
+suggests the tags already written on your items.
 
 Keeping tags in the summary rather than the description is deliberate: they survive being
 edited from the companion app or the core to-do card, anyone not using this card still
@@ -238,7 +246,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 95 assertions in jsdom
+npm test        # 103 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)

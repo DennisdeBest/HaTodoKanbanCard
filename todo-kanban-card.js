@@ -62,6 +62,18 @@ function splitTags(summary) {
   return { text: text || raw.trim(), tags };
 }
 
+// Add or remove `#tag` in a piece of item text, leaving the rest of it alone.
+function toggleTag(text, tag) {
+  const raw = String(text ?? "");
+  if (splitTags(raw).tags.includes(tag)) {
+    return raw
+      .replace(new RegExp(`(?:^|\\s)#${tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gu"), " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return `${raw.trim()} #${tag}`.trim();
+}
+
 function computeCssColor(value) {
   if (!value || typeof value !== "string") return value;
   return HA_COLORS.has(value) ? `var(--${value}-color)` : value;
@@ -873,9 +885,16 @@ class TodoKanbanCard extends HTMLElement {
     };
 
     const others = this._config.lanes.filter((l) => l.entity !== entity);
+    const known = this._knownTags();
     return el("div", { class: "editor" }, [
       name,
       el("div", { class: "row" }, [dueInput, desc]),
+      known.length
+        ? el("div", { class: "moveto" }, [
+            el("span", { class: "moveto-label", text: "Tags" }),
+            ...known.map((tag) => this._tagChip(tag, name)),
+          ])
+        : null,
       others.length
         ? el("div", { class: "moveto" }, [
             el("span", { class: "moveto-label", text: "Move to" }),
@@ -905,6 +924,38 @@ class TodoKanbanCard extends HTMLElement {
     ]);
   }
 
+  /*
+   * Every tag currently in play: the ones given a colour, plus the ones actually
+   * written on items. The card already subscribes to every lane, so this costs nothing
+   * — no extra round trip to offer suggestions.
+   */
+  _knownTags() {
+    const found = new Set(Object.keys(this._config.tags || {}));
+    for (const items of Object.values(this._items)) {
+      for (const item of items || []) {
+        for (const tag of splitTags(item.summary).tags) found.add(tag);
+      }
+    }
+    return [...found].sort((a, b) => a.localeCompare(b));
+  }
+
+  // A chip that puts a tag into, or takes it out of, a text field.
+  _tagChip(tag, field, onChange) {
+    const chip = el("button", {
+      class: "chip tag-chip",
+      // Never take focus: on a phone that closes the keyboard mid-edit.
+      onmousedown: (ev) => ev.preventDefault(),
+      onclick: () => {
+        field.value = toggleTag(field.value, tag);
+        chip.classList.toggle("on", splitTags(field.value).tags.includes(tag));
+        if (onChange) onChange(field.value);
+        field.focus();
+      },
+    }, [tag]);
+    if (splitTags(field.value).tags.includes(tag)) chip.classList.add("on");
+    return chip;
+  }
+
   _renderAdd(entity) {
     const key = `add.${entity}`;
     const input = el("input", {
@@ -924,17 +975,46 @@ class TodoKanbanCard extends HTMLElement {
       this._focus = [key, 0];
       await this._add(entity, text);
     };
+    /*
+     * The tag suggestions. Built on demand rather than up front, because the add row is
+     * created once for the life of the card — that is what keeps the field focused
+     * between items — so it cannot rely on a re-render to refresh its contents.
+     */
+    const suggest = el("div", { class: "tag-suggest", hidden: true });
+    const fillSuggest = () => {
+      const known = this._knownTags();
+      suggest.replaceChildren(
+        ...(known.length
+          ? known.map((tag) => this._tagChip(tag, input, (v) => { this._drafts[entity] = v; }))
+          : [el("span", { class: "no-tags", text: "No tags yet — type #something into an item" })])
+      );
+    };
+    const tagButton = el("button", {
+      class: "tag-btn",
+      title: "Tags",
+      onmousedown: (ev) => ev.preventDefault(),
+      onclick: () => {
+        suggest.hidden = !suggest.hidden;
+        if (!suggest.hidden) fillSuggest();
+        input.focus();
+      },
+    }, [icon("mdi:pound")]);
+
     return el("div", { class: "add" }, [
-      input,
-      el("button", {
-        class: "icon-btn",
-        title: "Add",
-        // Stops the tap moving focus off the input, so the caret stays put and a phone
-        // keyboard does not close between items. Programmatically re-focusing after the
-        // fact does not reopen a mobile keyboard, so it has to never leave.
-        onmousedown: (ev) => ev.preventDefault(),
-        onclick: submit,
-      }, [icon("mdi:plus")]),
+      el("div", { class: "add-row" }, [
+        input,
+        tagButton,
+        el("button", {
+          class: "icon-btn",
+          title: "Add",
+          // Stops the tap moving focus off the input, so the caret stays put and a phone
+          // keyboard does not close between items. Programmatically re-focusing after the
+          // fact does not reopen a mobile keyboard, so it has to never leave.
+          onmousedown: (ev) => ev.preventDefault(),
+          onclick: submit,
+        }, [icon("mdi:plus")]),
+      ]),
+      suggest,
     ]);
   }
 }
@@ -1025,7 +1105,22 @@ ha-card { padding: 8px 8px 12px; }
 .placeholder {
   height: 30px; border-radius: 8px; border: 2px dashed var(--lane-accent); opacity: 0.7;
 }
-.add { display: flex; align-items: center; gap: 4px; padding: 6px 2px 2px; }
+.add { padding: 6px 2px 2px; }
+.add-row { display: flex; align-items: center; gap: 4px; }
+.tag-btn {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--secondary-text-color);
+}
+.tag-btn:hover { background: rgba(127,127,127,.16); color: var(--primary-text-color); }
+.tag-btn ha-icon { --mdc-icon-size: 18px; }
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 2px 0; }
+.tag-chip { padding: 2px 9px; font-size: 12px; }
+.tag-chip.on {
+  background: var(--lane-accent); border-color: transparent;
+  color: var(--text-primary-color, #fff);
+}
+.no-tags { font-size: 12px; color: var(--secondary-text-color); padding: 2px; }
 .field {
   flex: 1; min-width: 0; box-sizing: border-box; padding: 7px 10px; border-radius: 8px;
   border: 1px solid var(--divider-color); background: var(--card-background-color);
