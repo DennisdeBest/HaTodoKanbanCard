@@ -20,7 +20,7 @@
  * MIT licensed. See README.md for the full config reference and more examples.
  */
 
-const VERSION = "1.2.1";
+const VERSION = "1.3.0-beta.1";
 const STORE = "todo-kanban.collapsed.";
 
 const DEFAULT_ICON = "mdi:format-list-checks";
@@ -38,6 +38,30 @@ const HA_COLORS = new Set([
   "black", "white", "primary-text", "secondary-text", "disabled",
 ]);
 
+/*
+ * Tags live in the item's own text as `#dairy`, rather than in a field of their own.
+ * Home Assistant's todo items have exactly four fields — summary, status, due,
+ * description — and no notion of a tag or a category, so anything tag-shaped has to be
+ * encoded in one of them. Putting them in the summary means they survive being edited
+ * from the companion app or the core todo card, they are visible to anyone not using
+ * this card, and uninstalling it leaves `Milk #dairy` rather than a field of stray YAML.
+ */
+const TAG_PATTERN = /(?:^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]*)/gu;
+
+function splitTags(summary) {
+  const raw = String(summary ?? "");
+  const tags = [];
+  const text = raw
+    .replace(TAG_PATTERN, (_match, tag) => {
+      if (!tags.includes(tag)) tags.push(tag);
+      return " ";
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+  // An item that is nothing but tags still needs something to show.
+  return { text: text || raw.trim(), tags };
+}
+
 function computeCssColor(value) {
   if (!value || typeof value !== "string") return value;
   return HA_COLORS.has(value) ? `var(--${value}-color)` : value;
@@ -51,7 +75,10 @@ const DEFAULTS = {
   default_collapsed: "auto",
   hide_completed: false,
   hide_add: false,
+  hide_tags: false,
   min_lane_width: 270,
+  // tag name -> colour. Any tag not listed here still shows, in a neutral chip.
+  tags: {},
 };
 
 function el(tag, props, children) {
@@ -143,6 +170,10 @@ class TodoKanbanCard extends HTMLElement {
         throw new Error(`todo-kanban-card: ${lane.entity} is not a todo entity`);
       }
     });
+    if (config.tags !== undefined
+        && (typeof config.tags !== "object" || config.tags === null || Array.isArray(config.tags))) {
+      throw new Error("todo-kanban-card: `tags` must be a map of tag name to colour");
+    }
     const collapse = config.default_collapsed;
     if (collapse !== undefined && !["auto", true, false].includes(collapse)) {
       throw new Error("todo-kanban-card: `default_collapsed` must be auto, true or false");
@@ -777,6 +808,12 @@ class TodoKanbanCard extends HTMLElement {
     });
 
     const due = dueLabel(item.due);
+    const lane = (this._config.lanes || []).find((l) => l.entity === entity) || {};
+    const parsed = this._opt(lane, "hide_tags")
+      ? { text: item.summary, tags: [] }
+      : splitTags(item.summary);
+    const palette = this._config.tags || {};
+
     const label = el("div", {
       class: "label",
       onclick: () => {
@@ -784,7 +821,14 @@ class TodoKanbanCard extends HTMLElement {
         this._render();
       },
     }, [
-      el("span", { class: "summary", text: item.summary }),
+      el("span", { class: "summary", text: parsed.text }),
+      // A tag with no colour configured still shows, in a neutral chip — tagging
+      // something should not require a trip to the editor first.
+      ...parsed.tags.map((tag) => {
+        const chip = el("span", { class: "tag", text: tag });
+        if (palette[tag]) chip.style.setProperty("--tag-color", computeCssColor(palette[tag]));
+        return chip;
+      }),
       due ? el("span", { class: `due ${due.state}`, text: due.text }) : null,
       item.description ? icon("mdi:text", "note") : null,
     ]);
@@ -961,6 +1005,11 @@ ha-card { padding: 8px 8px 12px; }
   font-size: 11px; padding: 1px 6px; border-radius: 8px; color: var(--secondary-text-color);
   background: rgba(127,127,127,0.16);
 }
+.tag {
+  font-size: 11px; padding: 0 7px; border-radius: 9px; white-space: nowrap;
+  color: var(--tag-color, var(--secondary-text-color));
+  border: 1px solid currentColor; opacity: .95;
+}
 .due.soon { color: var(--warning-color, #ff9800); }
 .due.overdue { color: var(--error-color); }
 .note { --mdc-icon-size: 14px; color: var(--secondary-text-color); }
@@ -1049,6 +1098,8 @@ const EDITOR_LABELS = {
   icon: "Icon",
   color: "Colour",
   add: "Add a list",
+  tag: "Tag",
+  add_tag: "Add a tag",
 };
 
 const CARD_SCHEMA = [
@@ -1095,22 +1146,78 @@ const LANE_SCHEMA = [
 
 const ADD_SCHEMA = [{ name: "add", selector: { entity: { domain: "todo" } } }];
 
+/*
+ * `custom_value: true` is what makes this an autocomplete rather than a fixed list: the
+ * options are the tags already written on items across the configured lists, but a tag
+ * that does not exist yet can simply be typed.
+ */
+const tagSchema = (known) => [
+  {
+    name: "",
+    type: "grid",
+    schema: [
+      {
+        name: "tag",
+        selector: { select: { mode: "dropdown", custom_value: true, sort: true, options: known } },
+      },
+      { name: "color", selector: { ui_color: { include_none: true, default_color: "none" } } },
+    ],
+  },
+];
+
+const addTagSchema = (known) => [
+  {
+    name: "add_tag",
+    selector: { select: { mode: "dropdown", custom_value: true, sort: true, options: known } },
+  },
+];
+
 class TodoKanbanCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
     this._config = { lanes: [] };
     this._built = false;
+    this._known = [];     // tags already in use, for the autocomplete
+  }
+
+  /*
+   * Read every configured list and collect the tags people have actually written, so
+   * the editor suggests `#dairy` rather than making you remember how you spelled it.
+   * Items are not in `hass.states` — only the outstanding count is — so this has to ask
+   * for them.
+   */
+  async _loadKnownTags() {
+    if (!this._hass || !this._config) return;
+    const found = new Set(Object.keys(this._config.tags || {}));
+    await Promise.all((this._config.lanes || []).map(async (lane) => {
+      try {
+        const res = await this._hass.callWS({ type: "todo/item/list", entity_id: lane.entity });
+        for (const item of (res && res.items) || []) {
+          for (const tag of splitTags(item.summary).tags) found.add(tag);
+        }
+      } catch (err) {
+        /* a list that cannot be read just contributes no suggestions */
+      }
+    }));
+    const known = [...found].sort((a, b) => a.localeCompare(b));
+    if (known.join("\u0000") === this._known.join("\u0000")) return;
+    this._known = known;
+    this._built = false;   // the options changed, so the forms need rebuilding
+    this._render();
   }
 
   setConfig(config) {
     this._config = { ...config, lanes: [...((config && config.lanes) || [])] };
     this._render();
+    this._loadKnownTags();
   }
 
   set hass(hass) {
+    const first = !this._hass;
     this._hass = hass;
     this._render();
+    if (first) this._loadKnownTags();
   }
 
   get hass() {
@@ -1172,6 +1279,47 @@ class TodoKanbanCardEditor extends HTMLElement {
     this._emit({ ...this._config, lanes });
   }
 
+  // The config carries `tags` as a map, which is the readable thing in YAML; the editor
+  // needs an ordered list to render rows from, so it converts in both directions.
+  _tagRows() {
+    return Object.entries(this._config.tags || {}).map(([tag, color]) => ({ tag, color }));
+  }
+
+  _emitTags(rows) {
+    const next = { ...this._config };
+    const tags = {};
+    for (const row of rows) {
+      if (!row.tag) continue;
+      tags[row.tag] = row.color || "";
+    }
+    if (Object.keys(tags).length) next.tags = tags;
+    else delete next.tags;
+    this._emit(next);
+  }
+
+  _tagChanged(index, ev) {
+    ev.stopPropagation();
+    const rows = this._tagRows();
+    const value = ev.detail.value;
+    if (!value.tag) return;                      // never write a nameless tag
+    rows[index] = { tag: value.tag, color: value.color || "" };
+    this._emitTags(rows);
+  }
+
+  _addTag(ev) {
+    ev.stopPropagation();
+    const tag = ev.detail.value && ev.detail.value.add_tag;
+    if (!tag) return;
+    const rows = this._tagRows();
+    if (rows.some((r) => r.tag === tag)) return; // already configured
+    rows.push({ tag, color: "" });
+    this._emitTags(rows);
+  }
+
+  _removeTag(index) {
+    this._emitTags(this._tagRows().filter((_, i) => i !== index));
+  }
+
   _addLane(ev) {
     ev.stopPropagation();
     const entity = ev.detail.value && ev.detail.value.add;
@@ -1216,7 +1364,8 @@ class TodoKanbanCardEditor extends HTMLElement {
 
     // Rebuild only when the number of lanes changes; otherwise refresh the existing
     // forms in place so the field being typed into keeps focus.
-    if (this._built && this._laneCount === lanes.length) {
+    const tagRows = this._tagRows();
+    if (this._built && this._laneCount === lanes.length && this._tagCount === tagRows.length) {
       this._cardForm.hass = this._hass;
       this._cardForm.data = this._cardData();
       this._laneForms.forEach((form, i) => {
@@ -1224,6 +1373,11 @@ class TodoKanbanCardEditor extends HTMLElement {
         form.data = { ...lanes[i] };
       });
       this._addForm.hass = this._hass;
+      this._tagForms.forEach((form, i) => {
+        form.hass = this._hass;
+        form.data = { ...tagRows[i] };
+      });
+      if (this._addTagForm) this._addTagForm.hass = this._hass;
       return;
     }
 
@@ -1252,12 +1406,34 @@ class TodoKanbanCardEditor extends HTMLElement {
 
     this._addForm = this._form(ADD_SCHEMA, { add: "" }, (ev) => this._addLane(ev));
     root.appendChild(el("div", { class: "add-row" }, [this._addForm]));
+
+    root.appendChild(el("h3", { class: "section-title", text: "Tag colours" }));
+    root.appendChild(el("p", { class: "hint", text:
+      "Write a tag straight into an item — \u201cMilk #dairy\u201d — and it shows as a chip. " +
+      "Give a tag a colour here; anything not listed still shows, in grey." }));
+
+    this._tagForms = [];
+    tagRows.forEach((row, i) => {
+      const form = this._form(tagSchema(this._known), { ...row }, (ev) => this._tagChanged(i, ev));
+      this._tagForms.push(form);
+      root.appendChild(el("div", { class: "lane-row" }, [
+        el("div", { class: "lane-tools" }, [
+          this._button("mdi:delete-outline", "Remove this tag", () => this._removeTag(i)),
+        ]),
+        form,
+      ]));
+    });
+
+    this._addTagForm = this._form(addTagSchema(this._known), { add_tag: "" }, (ev) => this._addTag(ev));
+    root.appendChild(el("div", { class: "add-row" }, [this._addTagForm]));
+
     root.appendChild(el("p", { class: "hint", text:
       "Per-list overrides for folding, the add box and completed items are available " +
       "in YAML, and are left alone by this editor." }));
 
     this._built = true;
     this._laneCount = lanes.length;
+    this._tagCount = tagRows.length;
   }
 }
 

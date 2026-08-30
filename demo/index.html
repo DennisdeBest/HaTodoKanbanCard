@@ -23,6 +23,22 @@
     --rgb-error-color: 219,68,55;
     --mdc-icon-size: 24px;
     --page-background: #f2f4f7;
+
+    /* Home Assistant's colour palette, verbatim, so `color: red` on a lane and the tag
+       chips look here exactly as they do in a dashboard. Without these the card asks
+       for var(--orange-color), gets nothing, and falls back to grey. */
+    --red-color: #f44336;        --pink-color: #e91e63;
+    --purple-color: #926bc7;     --deep-purple-color: #6e41ab;
+    --indigo-color: #3f51b5;     --blue-color: #2196f3;
+    --light-blue-color: #03a9f4; --cyan-color: #00bcd4;
+    --teal-color: #009688;       --green-color: #4caf50;
+    --light-green-color: #8bc34a;--lime-color: #cddc39;
+    --yellow-color: #ffeb3b;     --amber-color: #ffc107;
+    --orange-color: #ff9800;     --deep-orange-color: #ff6f22;
+    --brown-color: #795548;      --light-grey-color: #bdbdbd;
+    --grey-color: #9e9e9e;       --dark-grey-color: #606060;
+    --blue-grey-color: #607d8b;  --black-color: #000000;
+    --white-color: #ffffff;
   }
   html[data-theme="dark"] {
     color-scheme: dark;
@@ -127,19 +143,24 @@ const EXAMPLES = [
   {
     id: "shopping",
     heading: "Shopping, split by urgency",
-    blurb: "The board this card was written for. Something you need today, the normal run, and things to pick up eventually.",
+    blurb: "The board this card was written for. Something you need today, the normal run, and things to pick up eventually. Tags are written straight into the item text.",
     lists: {
-      "todo.shopping_urgent": [{ summary: "Bin bags" }, { summary: "Cat litter", due: day(0) }],
+      "todo.shopping_urgent": [
+        { summary: "Bin bags #household" },
+        { summary: "Cat litter #pets", due: day(0) },
+      ],
       "todo.shopping": [
-        { summary: "Lemon juice" }, { summary: "Smoked paprika" },
-        { summary: "Black peppercorns", description: "coarse, for the grinder" },
+        { summary: "Lemon juice #fresh" },
+        { summary: "Smoked paprika #spices" },
+        { summary: "Black peppercorns #spices", description: "coarse, for the grinder" },
         { summary: "Cling film", status: "completed" },
       ],
-      "todo.shopping_long_haul": [{ summary: "New frying pan", due: day(24) }],
+      "todo.shopping_long_haul": [{ summary: "New frying pan #kitchen", due: day(24) }],
     },
     config: {
       type: "custom:todo-kanban-card",
       title: "Shopping",
+      tags: { spices: "orange", fresh: "green", pets: "purple", household: "blue-grey" },
       lanes: [
         { entity: "todo.shopping_urgent", title: "Urgent", icon: "mdi:alert-octagon", color: "var(--error-color)" },
         { entity: "todo.shopping", title: "Normal", icon: "mdi:cart", color: "var(--primary-color)" },

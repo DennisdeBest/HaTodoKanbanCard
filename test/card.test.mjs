@@ -425,3 +425,81 @@ describe("config validation", () => {
     assert.doesNotThrow(() => card.setConfig(customElements.get("todo-kanban-card").getStubConfig()));
   });
 });
+
+describe("tags written into an item", () => {
+  const tagged = {
+    "todo.urgent": [
+      { uid: "t1", summary: "Milk #dairy", status: "needs_action" },
+      { uid: "t2", summary: "#frozen Peas #veg", status: "needs_action" },
+      { uid: "t3", summary: "Nothing tagged here", status: "needs_action" },
+    ],
+    "todo.normal": [],
+    "todo.later": [],
+  };
+  const chips = (row) => [...row.querySelectorAll(".tag")].map((c) => c.textContent);
+
+  test("shows tags as chips and takes them out of the item's text", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    await tick();
+    const rows = $$(".lane")[0].querySelectorAll(".items > [data-uid]");
+    assert.equal(rows[0].querySelector(".summary").textContent, "Milk");
+    assert.deepEqual(chips(rows[0]), ["dairy"]);
+    assert.equal(rows[1].querySelector(".summary").textContent, "Peas");
+    assert.deepEqual(chips(rows[1]), ["frozen", "veg"]);
+  });
+
+  test("an untagged item is left alone", async () => {
+    const { $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    await tick();
+    const row = $$(".lane")[0].querySelectorAll(".items > [data-uid]")[2];
+    assert.equal(row.querySelector(".summary").textContent, "Nothing tagged here");
+    assert.equal(chips(row).length, 0);
+  });
+
+  test("a configured tag gets its colour, an unconfigured one still shows", async () => {
+    const { $$ } = fixture(
+      { default_collapsed: false, tags: { dairy: "blue", veg: "#4caf50" } },
+      structuredClone(tagged)
+    );
+    await tick();
+    const rows = $$(".lane")[0].querySelectorAll(".items > [data-uid]");
+    assert.equal(rows[0].querySelector(".tag").style.getPropertyValue("--tag-color"),
+      "var(--blue-color)");
+    const second = [...rows[1].querySelectorAll(".tag")];
+    assert.equal(second[0].style.getPropertyValue("--tag-color"), "", "frozen is unconfigured");
+    assert.equal(second[1].style.getPropertyValue("--tag-color"), "#4caf50");
+  });
+
+  test("hide_tags leaves the raw text alone", async () => {
+    const { $$ } = fixture(
+      { default_collapsed: false, hide_tags: true },
+      structuredClone(tagged)
+    );
+    await tick();
+    const row = $$(".lane")[0].querySelector(".items > [data-uid]");
+    assert.equal(row.querySelector(".summary").textContent, "Milk #dairy");
+    assert.equal(chips(row).length, 0);
+  });
+
+  test("the editor still shows the full text, tags included", async () => {
+    const { $, $$ } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    assert.equal($(".editor input[type=text]").value, "Milk #dairy");
+  });
+
+  test("renaming through the editor keeps whatever tags were typed", async () => {
+    const { $, $$, calls } = fixture({ default_collapsed: false }, structuredClone(tagged));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    $(".editor input[type=text]").value = "Oat milk #dairy #new";
+    click([...$(".editor").querySelectorAll(".actions .chip")].at(-1));
+    await tick();
+    assert.equal(calls.at(-1)[1].rename, "Oat milk #dairy #new");
+  });
+
+  test("rejects a tags value that is not a map", () => {
+    assert.throws(() => document.createElement("todo-kanban-card")
+      .setConfig({ lanes: [{ entity: "todo.a" }], tags: ["dairy"] }));
+  });
+});

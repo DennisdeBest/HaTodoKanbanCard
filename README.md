@@ -31,6 +31,8 @@ a row — to another position, or to another lane:
 - Tick items off, add new ones, and fold away the completed ones per lane.
 - **Fold a lane** by clicking its header. A lane with nothing left in it starts folded,
   which keeps a five-lane board readable.
+- **Tags**, written straight into the item: `Milk #dairy` shows as *Milk* with a `dairy`
+  chip. Colour them if you like; uncoloured tags still show.
 - **Live**: one `todo/item/subscribe` per lane, so the board follows changes from the
   companion app, another tablet or an automation without a refresh.
 
@@ -105,7 +107,40 @@ lanes:
 | `default_collapsed` | `auto` \| `true` \| `false` | `auto` | `auto` folds a lane that is empty and opens one that is not. `true` / `false` pin it. |
 | `hide_completed` | boolean | `false` | Drop the "done" section entirely. |
 | `hide_add` | boolean | `false` | Drop the "add an item" box. |
+| `hide_tags` | boolean | `false` | Stop parsing `#tags` out of item text. |
+| `tags` | map | – | Tag name to colour, e.g. `dairy: blue`. Palette names or CSS. |
 | `min_lane_width` | number | `270` | Pixels. Lanes wrap to a new row below this width. |
+
+### Tags
+
+Home Assistant's to-do items have four fields — summary, status, due date and
+description — and no notion of a tag. So a tag lives in the item's own text:
+
+```
+Milk #dairy
+#frozen Peas #veg
+```
+
+The card lifts the `#tags` out and shows them as chips next to the item, leaving *Milk*
+and *Peas* as the text. Give them colours if you want to:
+
+```yaml
+type: custom:todo-kanban-card
+tags:
+  dairy: blue
+  spices: orange
+  urgent: red
+lanes: [...]
+```
+
+Any tag not listed still shows, in a neutral chip — tagging something never requires a
+trip to the editor first. The **visual editor** has a tag section that suggests the tags
+already written on your items, so you do not have to remember how you spelled one.
+
+Keeping tags in the summary rather than the description is deliberate: they survive being
+edited from the companion app or the core to-do card, anyone not using this card still
+sees them, and uninstalling it leaves `Milk #dairy` rather than a field of stray
+metadata. Set `hide_tags: true` on the card or a lane to switch the parsing off.
 
 ### Lane options
 
@@ -115,7 +150,7 @@ lanes:
 | `title` | string | friendly name | |
 | `icon` | string | `mdi:format-list-checks` | |
 | `color` | colour | `var(--primary-color)` | Accents the header, count, checkbox and add button. A Home Assistant palette name (`red`, `purple`, `deep-orange`, …), which follows the theme, or any CSS colour such as `#9c27b0` or `var(--error-color)`. |
-| `hide_completed`, `hide_add`, `default_collapsed` | | inherited | Override the card-wide setting for one lane. |
+| `hide_completed`, `hide_add`, `hide_tags`, `default_collapsed` | | inherited | Override the card-wide setting for one lane. |
 
 Anything set on a lane wins over the same option on the card.
 
@@ -203,7 +238,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 ## Develop
 
 ```bash
-npm test        # 77 assertions in jsdom
+npm test        # 95 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)

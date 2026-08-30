@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0
+
+- **Tags.** Write one into an item — `Milk #dairy` — and the card shows *Milk* with a
+  `dairy` chip beside it. Colour them with a `tags:` map; any tag you have not coloured
+  still shows, in a neutral chip, so tagging something never means visiting the editor
+  first. `hide_tags: true` turns the parsing off, on the card or one lane.
+
+  Tags live in the item's summary rather than a field of their own because Home
+  Assistant's to-do items do not have one — the fields are summary, status, due and
+  description, and nothing else. Keeping them in the summary means they survive editing
+  from the companion app or the core to-do card, they are visible to anyone not using
+  this card, and uninstalling it leaves `Milk #dairy` rather than stray metadata.
+- **The editor suggests tags you have already used.** It reads the configured lists and
+  offers what it finds, while still accepting a tag that does not exist yet.
+
 ## 1.2.1
 
 Documentation only — the card itself is unchanged from 1.2.0.

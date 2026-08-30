@@ -8,6 +8,10 @@
  * `ha-icon-picker` and `ha-color-picker`, which only exist inside a dashboard. Faking
  * them would produce a picture of something that does not exist.
  *
+ * **It photographs the version installed on that instance, not your working tree.** The
+ * page loads the card from HACS like any dashboard would, so run your deploy step first
+ * or you will screenshot the last release and wonder where your new section went.
+ *
  * So this loads a real dashboard (which is what defines those elements and gives us a
  * `hass` object), then builds the editor element and photographs it. Nothing is opened
  * in edit mode and nothing is saved — the instance is only ever read from.
@@ -43,6 +47,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CONFIG = {
   title: "Shopping",
+  tags: { spices: "orange", fresh: "green", pets: "purple" },
   lanes: [
     { entity: "todo.shopping_urgent", title: "Urgent", icon: "mdi:alert-octagon", color: "red" },
     { entity: "todo.shopping", title: "Normal", icon: "mdi:cart", color: "blue" },
@@ -58,7 +63,7 @@ const browser = await puppeteer.launch({
 try {
   await mkdir(DOCS, { recursive: true });
   const page = await browser.newPage();
-  await page.setViewport({ width: 900, height: 2600, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 900, height: 3400, deviceScaleFactor: 2 });
 
   await page.goto(`${HA_URL}/lovelace/0`, { waitUntil: "domcontentloaded" });
   await page.evaluate((token, url) => {
