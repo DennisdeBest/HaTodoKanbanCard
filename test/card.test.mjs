@@ -456,7 +456,7 @@ describe("tags written into an item", () => {
     assert.equal(chips(row).length, 0);
   });
 
-  test("a configured tag gets its colour, an unconfigured one still shows", async () => {
+  test("a configured tag gets its colour", async () => {
     const { $$ } = fixture(
       { default_collapsed: false, enable_tags: true, tags: { dairy: "blue", veg: "#4caf50" } },
       structuredClone(tagged)
@@ -465,9 +465,28 @@ describe("tags written into an item", () => {
     const rows = $$(".lane")[0].querySelectorAll(".items > [data-uid]");
     assert.equal(rows[0].querySelector(".tag").style.getPropertyValue("--tag-color"),
       "var(--blue-color)");
-    const second = [...rows[1].querySelectorAll(".tag")];
-    assert.equal(second[0].style.getPropertyValue("--tag-color"), "", "frozen is unconfigured");
-    assert.equal(second[1].style.getPropertyValue("--tag-color"), "#4caf50");
+    assert.equal([...rows[1].querySelectorAll(".tag")][1].style.getPropertyValue("--tag-color"),
+      "#4caf50");
+  });
+
+  test("an unconfigured tag is given a colour of its own, the same one every time", async () => {
+    const paint = () => {
+      document.body.innerHTML = "";
+      const { $$ } = fixture({ default_collapsed: false, enable_tags: true },
+        structuredClone(tagged));
+      return $$;
+    };
+    const first = paint();
+    await tick();
+    const colour = first(".lane")[1] && null;   // settle
+    const chips = () => [...document.querySelector("todo-kanban-card").shadowRoot
+      .querySelectorAll(".tag")].map((c) => c.style.getPropertyValue("--tag-color"));
+    const once = chips();
+    assert.ok(once.every((c) => /^var\(--[a-z-]+-color\)$/.test(c)),
+      `expected palette colours, got ${JSON.stringify(once)}`);
+    paint();
+    await tick();
+    assert.deepEqual(chips(), once, "the same tag should not change colour between renders");
   });
 
   test("tags are off unless asked for, leaving the raw text alone", async () => {
@@ -782,5 +801,74 @@ describe("tags with spaces in them", () => {
     click(add.querySelector(".tag-btn"));
     click([...add.querySelectorAll(".tag-chip")].find((c) => c.textContent === "weekend baking"));
     assert.equal(add.querySelector(".field").value, 'Flour #"weekend baking"');
+  });
+});
+
+describe("editing an item updates it as you go", () => {
+  const seeded = {
+    "todo.urgent": [{ uid: "e1", summary: "Milk #dairy", status: "needs_action" }],
+    "todo.normal": [{ uid: "e2", summary: "Peas #frozen", status: "needs_action" }],
+    "todo.later": [],
+  };
+  const on = { default_collapsed: false, enable_tags: true };
+  const shown = ($$) => {
+    // While the editor is open the row is wrapped; once it closes it is the row itself.
+    const block = $$(".lane")[0].querySelector(".items > [data-uid]");
+    const row = block.classList.contains("item") ? block : block.querySelector(".item");
+    return {
+      text: row.querySelector(".summary").textContent,
+      tags: [...row.querySelectorAll(".tag")].map((t) => t.textContent),
+    };
+  };
+
+  test("toggling a tag chip shows on the item straight away", async () => {
+    const { $, $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    assert.deepEqual(shown($$), { text: "Milk", tags: ["dairy"] });
+    const chip = [...$(".editor").querySelectorAll(".tag-chip")].find((c) => c.textContent === "frozen");
+    click(chip);
+    assert.deepEqual(shown($$), { text: "Milk", tags: ["dairy", "frozen"] },
+      "the item should follow the editor without waiting for save");
+  });
+
+  test("and toggling it back off removes it again", async () => {
+    const { $, $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    const chip = [...$(".editor").querySelectorAll(".tag-chip")].find((c) => c.textContent === "dairy");
+    click(chip);
+    assert.deepEqual(shown($$), { text: "Milk", tags: [] });
+  });
+
+  test("typing a name shows on the item too", async () => {
+    const { $, $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    input($(".editor input[type=text]"), "Oat milk #dairy");
+    assert.deepEqual(shown($$), { text: "Oat milk", tags: ["dairy"] });
+  });
+
+  test("cancelling puts the item back the way it was", async () => {
+    const { $, $$ } = fixture(on, structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    input($(".editor input[type=text]"), "Something else entirely");
+    const cancel = [...$(".editor").querySelectorAll(".actions .chip")].find((b) => b.textContent === "Cancel");
+    click(cancel);
+    assert.deepEqual(shown($$), { text: "Milk", tags: ["dairy"] });
+  });
+
+  test("the picker chips carry each tag's own colour, not the lane's", async () => {
+    const { $, $$ } = fixture({ ...on, tags: { dairy: "blue", frozen: "cyan" } },
+      structuredClone(seeded));
+    await tick();
+    click($$(".lane")[0].querySelector(".items > [data-uid] .label"));
+    const chips = [...$(".editor").querySelectorAll(".tag-chip")];
+    const byName = Object.fromEntries(chips.map((c) => [c.textContent, c]));
+    assert.equal(byName.dairy.style.getPropertyValue("--tag-color"), "var(--blue-color)");
+    assert.equal(byName.frozen.style.getPropertyValue("--tag-color"), "var(--cyan-color)");
+    assert.ok(byName.dairy.classList.contains("on"), "dairy is on this item");
+    assert.ok(!byName.frozen.classList.contains("on"));
   });
 });

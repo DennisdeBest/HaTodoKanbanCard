@@ -1,6 +1,6 @@
 import { el, icon, dueLabel } from "./dom.js";
 import { splitTags, formatTag, toggleTag, tagTokenAt } from "./tags.js";
-import { computeCssColor } from "./colors.js";
+import { computeCssColor, tagColor } from "./colors.js";
 import STYLE from "./styles.css";
 
 const STORE = "todo-kanban.collapsed.";
@@ -713,6 +713,24 @@ export class TodoKanbanCard extends HTMLElement {
       : { text: item.summary, tags: [] };
     const palette = this._config.tags || {};
 
+    // Rebuilt in place while the editor is open, so toggling a tag or typing a name is
+    // reflected on the item straight away rather than only once it is saved.
+    const paint = (summary) => {
+      const shown = this._opt(lane, "enable_tags")
+        ? splitTags(summary)
+        : { text: summary, tags: [] };
+      label.replaceChildren(
+        el("span", { class: "summary", text: shown.text }),
+        ...shown.tags.map((tag) => {
+          const chip = el("span", { class: "tag", text: tag });
+          chip.style.setProperty("--tag-color", tagColor(tag, palette));
+          return chip;
+        }),
+        ...(due ? [el("span", { class: `due ${due.state}`, text: due.text })] : []),
+        ...(item.description ? [icon("mdi:text", "note")] : [])
+      );
+    };
+
     const label = el("div", {
       class: "label",
       onclick: () => {
@@ -725,7 +743,7 @@ export class TodoKanbanCard extends HTMLElement {
       // something should not require a trip to the editor first.
       ...parsed.tags.map((tag) => {
         const chip = el("span", { class: "tag", text: tag });
-        if (palette[tag]) chip.style.setProperty("--tag-color", computeCssColor(palette[tag]));
+        chip.style.setProperty("--tag-color", tagColor(tag, palette));
         return chip;
       }),
       due ? el("span", { class: `due ${due.state}`, text: due.text }) : null,
@@ -742,14 +760,16 @@ export class TodoKanbanCard extends HTMLElement {
     if (!editing) return row;
 
     const wrap = el("div", { class: "item-wrap", "data-uid": item.uid },
-      [row, this._renderEditor(entity, item)]);
+      [row, this._renderEditor(entity, item, paint)]);
     return wrap;
   }
 
-  _renderEditor(entity, item) {
+  _renderEditor(entity, item, preview) {
     const key = `edit.${item.uid}`;
     const name = el("input", {
       type: "text", class: "field", value: item.summary, "data-focus": `${key}.name`,
+      // Typing shows on the item as you go, the same as toggling a chip does.
+      oninput: (ev) => preview(ev.target.value),
       onkeydown: (ev) => { if (ev.key === "Enter") save(); if (ev.key === "Escape") close(); },
     });
     const dueInput = el("input", {
@@ -761,7 +781,11 @@ export class TodoKanbanCard extends HTMLElement {
     });
     desc.value = item.description || "";
 
-    const close = () => { this._editing = null; this._render(); };
+    const close = () => {
+      preview(item.summary);          // undo anything previewed but not saved
+      this._editing = null;
+      this._render();
+    };
     const save = async () => {
       await this._save(entity, item, {
         summary: name.value.trim() || item.summary,
@@ -781,7 +805,7 @@ export class TodoKanbanCard extends HTMLElement {
       known.length
         ? el("div", { class: "moveto" }, [
             el("span", { class: "moveto-label", text: "Tags" }),
-            ...known.map((tag) => this._tagChip(tag, name)),
+            ...known.map((tag) => this._tagChip(tag, name, (value) => preview(value))),
           ])
         : null,
       others.length
@@ -829,6 +853,14 @@ export class TodoKanbanCard extends HTMLElement {
   }
 
   // A chip that puts a tag into, or takes it out of, a text field.
+  /*
+   * A chip that puts a tag into, or takes it out of, a text field.
+   *
+   * It wears the tag's own colour when it is on and a muted version of it when it is
+   * off, rather than the lane's accent — the point of the row is to show what the tags
+   * look like. A tag whose colour happens to be grey is then harder to read as on or
+   * off, which is the price of every other tag being obvious.
+   */
   _tagChip(tag, field, onChange) {
     const chip = el("button", {
       class: "chip tag-chip",
@@ -841,6 +873,7 @@ export class TodoKanbanCard extends HTMLElement {
         field.focus();
       },
     }, [tag]);
+    chip.style.setProperty("--tag-color", tagColor(tag, this._config.tags || {}));
     if (splitTags(field.value).tags.includes(tag)) chip.classList.add("on");
     return chip;
   }

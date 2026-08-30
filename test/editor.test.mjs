@@ -271,11 +271,20 @@ describe("tag colours in the editor", () => {
     assert.deepEqual(tagForms()[1].data, { tag: "veg", color: "green" });
   });
 
-  test("picking a tag adds a row", async () => {
+  test("picking a tag adds a row, already on a colour", async () => {
     const { addTagForm, changes } = tagEditor(BASE);
     await tick(40);
     addTagForm().emit({ add_tag: "dairy" });
-    assert.deepEqual(changes.at(-1).tags, { dairy: "" });
+    assert.deepEqual(Object.keys(changes.at(-1).tags), ["dairy"]);
+    assert.ok(changes.at(-1).tags.dairy, "a new tag should arrive with a colour to adjust");
+  });
+
+  test("a second tag does not get the same colour as the first", async () => {
+    const { addTagForm, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+    await tick(40);
+    addTagForm().emit({ add_tag: "veg" });
+    const tags = changes.at(-1).tags;
+    assert.notEqual(tags.veg, tags.dairy);
   });
 
   test("the same tag cannot be added twice", async () => {

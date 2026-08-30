@@ -2,6 +2,16 @@
 
 ## 1.3.0
 
+- **Every tag gets a colour, whether or not you chose one.** An unconfigured tag is
+  given a stable colour derived from its name, so tags look distinct from the moment
+  they are typed rather than all arriving grey. Adding one in the editor prefills a
+  colour nothing else has taken, ready to adjust.
+- **The tag chips in an item's editor wear the tag's own colour** — filled when the tag
+  is on, faded when it is off — rather than the lane's accent, so the row shows what the
+  tags will actually look like.
+- **Editing an item shows on the item as you go.** Toggling a tag or typing a name is
+  reflected on the row straight away instead of only after saving, and cancelling puts
+  it back.
 - **Tags can contain spaces**, written in quotes after the hash: `Flour #"weekend
   baking"`. Unquoted they would read back as several one-word tags.
 - **The source is split into modules under `src/`,** and `npm run build` bundles them

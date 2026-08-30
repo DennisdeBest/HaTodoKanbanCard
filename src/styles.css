@@ -95,8 +95,17 @@ ha-card { padding: 8px 8px 12px; }
 .tag-btn ha-icon { --mdc-icon-size: 18px; }
 .tag-suggest { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 2px 0; }
 .tag-chip { padding: 2px 9px; font-size: 12px; }
+/* Off: the tag's own colour, muted right down. On: the colour itself, filled. A tag
+   whose colour is grey is admittedly harder to read either way — worth it for every
+   other tag showing what it will actually look like. */
+.tag-chip {
+  color: var(--tag-color, var(--secondary-text-color));
+  border-color: currentColor; opacity: .45;
+}
 .tag-chip.on {
-  background: var(--lane-accent); border-color: transparent;
+  opacity: 1;
+  background: var(--tag-color, var(--lane-accent));
+  border-color: transparent;
   color: var(--text-primary-color, #fff);
 }
 .no-tags { font-size: 12px; color: var(--secondary-text-color); padding: 2px; }

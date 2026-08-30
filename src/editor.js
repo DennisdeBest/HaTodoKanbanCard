@@ -1,5 +1,6 @@
 import { el } from "./dom.js";
 import { splitTags } from "./tags.js";
+import { nextFreeTagColor } from "./colors.js";
 import EDITOR_STYLE from "./editor-styles.css";
 
 const EDITOR_LABELS = {
@@ -227,7 +228,9 @@ export class TodoKanbanCardEditor extends HTMLElement {
     if (!tag) return;
     const rows = this._tagRows();
     if (rows.some((r) => r.tag === tag)) return; // already configured
-    rows.push({ tag, color: "" });
+    // Start it on a colour nothing else has taken, so a list of tags ends up varied
+    // without anyone having to choose. Adjustable right there in the row.
+    rows.push({ tag, color: nextFreeTagColor(this._config.tags || {}) });
     this._emitTags(rows);
   }
 

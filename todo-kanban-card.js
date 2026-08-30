@@ -1,4 +1,4 @@
-/* todo-kanban-card 1.3.0-beta.4 — https://github.com/DennisdeBest/HaTodoKanbanCard
+/* todo-kanban-card 1.3.0-beta.5 — https://github.com/DennisdeBest/HaTodoKanbanCard
  *
  * BUILT FILE — do not edit. The source is in src/; run `npm run build`.
  * MIT licensed. Bundled from src/ so that HACS, which installs exactly one file,
@@ -120,9 +120,37 @@ function computeCssColor(value) {
   if (!value || typeof value !== "string") return value;
   return HA_COLORS.has(value) ? `var(--${value}-color)` : value;
 }
+var TAG_PALETTE = [
+  "blue",
+  "green",
+  "orange",
+  "purple",
+  "teal",
+  "pink",
+  "amber",
+  "indigo",
+  "light-green",
+  "deep-orange",
+  "cyan",
+  "brown"
+];
+function hashOf(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = hash * 31 + value.charCodeAt(i) >>> 0;
+  return hash;
+}
+function tagColor(tag, configured) {
+  const set = (configured || {})[tag];
+  if (set) return computeCssColor(set);
+  return computeCssColor(TAG_PALETTE[hashOf(String(tag)) % TAG_PALETTE.length]);
+}
+function nextFreeTagColor(configured) {
+  const taken = new Set(Object.values(configured || {}).filter(Boolean));
+  return TAG_PALETTE.find((c) => !taken.has(c)) || TAG_PALETTE[0];
+}
 
 // src/styles.css
-var styles_default = "/* Styles for the board. Bundled into the card at build time. */\n:host { display: block; }\n[hidden] { display: none !important; }\nha-card { padding: 8px 8px 12px; }\n.card-title {\n  font-size: var(--ha-font-size-l, 20px); font-weight: 500;\n  margin: 8px 8px 4px; color: var(--primary-text-color);\n}\n.error {\n  display: flex; align-items: center; gap: 8px; margin: 4px 8px 8px; padding: 8px 12px;\n  border-radius: 10px; background: rgba(var(--rgb-error-color, 219,68,55), 0.12);\n  color: var(--error-color); font-size: 13px;\n}\n.board {\n  display: grid; gap: 8px;\n  grid-template-columns: repeat(auto-fit, minmax(var(--lane-min, 270px), 1fr));\n}\n.lane {\n  --lane-accent: var(--primary-color);\n  display: flex; flex-direction: column; min-width: 0;\n  border-radius: 12px; padding: 4px 6px 6px;\n  background: var(--secondary-background-color, rgba(127,127,127,0.08));\n  border: 1px solid transparent;\n}\n.lane.drop-target { border-color: var(--lane-accent); }\n.lane.collapsed .items,\n.lane.collapsed .add,\n.lane.collapsed .done-wrap,\n.lane.gone .items,\n.lane.gone .add,\n.lane.gone .done-wrap { display: none; }\n.lane-head {\n  display: flex; align-items: center; gap: 8px; padding: 8px 6px; cursor: pointer;\n  user-select: none;\n}\n.lane-icon { color: var(--lane-accent); --mdc-icon-size: 20px; }\n.lane-title {\n  flex: 1; min-width: 0; font-weight: 500; color: var(--primary-text-color);\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;\n}\n.count {\n  min-width: 22px; padding: 1px 7px; border-radius: 11px; text-align: center;\n  font-size: 12px; font-weight: 600; color: var(--text-primary-color, #fff);\n  background: var(--lane-accent);\n}\n.count.done { background: none; color: var(--success-color, #4caf50); --mdc-icon-size: 20px; }\n.chev { color: var(--secondary-text-color); --mdc-icon-size: 20px; }\n.items { display: flex; flex-direction: column; gap: 2px; }\n.empty, .missing { padding: 10px 8px; color: var(--secondary-text-color); font-size: 13px; }\n.item {\n  display: flex; align-items: center; gap: 6px; padding: 4px 2px 4px 4px;\n  border-radius: 8px; background: var(--card-background-color);\n}\n.item.dragging { opacity: 0.35; }\n.item.completed .summary { text-decoration: line-through; color: var(--secondary-text-color); }\n.item-wrap { display: flex; flex-direction: column; gap: 2px; }\n.check { flex: none; width: 18px; height: 18px; accent-color: var(--lane-accent); }\n.label {\n  flex: 1; min-width: 0; cursor: pointer; padding: 4px 2px;\n  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;\n}\n.summary { color: var(--primary-text-color); font-size: 14px; word-break: break-word; }\n.due {\n  font-size: 11px; padding: 1px 6px; border-radius: 8px; color: var(--secondary-text-color);\n  background: rgba(127,127,127,0.16);\n}\n.tag {\n  font-size: 11px; padding: 0 7px; border-radius: 9px; white-space: nowrap;\n  color: var(--tag-color, var(--secondary-text-color));\n  border: 1px solid currentColor; opacity: .95;\n}\n.due.soon { color: var(--warning-color, #ff9800); }\n.due.overdue { color: var(--error-color); }\n.note { --mdc-icon-size: 14px; color: var(--secondary-text-color); }\n.grip {\n  flex: none; display: grid; place-items: center; width: 30px; height: 30px;\n  color: var(--secondary-text-color); cursor: grab; touch-action: none;\n}\n.grip:active { cursor: grabbing; }\n.ghost {\n  position: fixed; z-index: 10; pointer-events: none; opacity: 0.95;\n  box-shadow: var(--ha-card-box-shadow, 0 4px 14px rgba(0,0,0,0.35));\n}\n.placeholder {\n  height: 30px; border-radius: 8px; border: 2px dashed var(--lane-accent); opacity: 0.7;\n}\n.add { padding: 6px 2px 2px; }\n.add-row { display: flex; align-items: center; gap: 4px; }\n.tag-btn {\n  flex: none; display: grid; place-items: center; width: 30px; height: 30px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: transparent; color: var(--secondary-text-color);\n}\n.tag-btn:hover { background: rgba(127,127,127,.16); color: var(--primary-text-color); }\n.tag-btn ha-icon { --mdc-icon-size: 18px; }\n.tag-suggest { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 2px 0; }\n.tag-chip { padding: 2px 9px; font-size: 12px; }\n.tag-chip.on {\n  background: var(--lane-accent); border-color: transparent;\n  color: var(--text-primary-color, #fff);\n}\n.no-tags { font-size: 12px; color: var(--secondary-text-color); padding: 2px; }\n.field {\n  flex: 1; min-width: 0; box-sizing: border-box; padding: 7px 10px; border-radius: 8px;\n  border: 1px solid var(--divider-color); background: var(--card-background-color);\n  color: var(--primary-text-color); font: inherit; font-size: 14px;\n}\n.field:focus { outline: none; border-color: var(--lane-accent); }\n.field.short { flex: 0 0 auto; width: 9.5em; }\n.icon-btn {\n  flex: none; display: grid; place-items: center; width: 34px; height: 34px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: var(--lane-accent); color: var(--text-primary-color, #fff);\n}\n.editor {\n  display: flex; flex-direction: column; gap: 6px;\n  padding: 8px; margin: 0 0 2px; border-radius: 8px;\n  background: var(--card-background-color);\n  border: 1px solid var(--divider-color);\n}\n.editor .row { display: flex; gap: 6px; align-items: flex-start; }\n.moveto { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }\n.moveto-label { font-size: 12px; color: var(--secondary-text-color); }\n.actions { display: flex; align-items: center; gap: 6px; }\n.spacer { flex: 1; }\n.chip {\n  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;\n  border-radius: 14px; border: 1px solid var(--divider-color); cursor: pointer;\n  background: transparent; color: var(--primary-text-color); font: inherit; font-size: 13px;\n}\n.chip ha-icon { --mdc-icon-size: 16px; }\n.chip.primary { background: var(--lane-accent); border-color: transparent; color: var(--text-primary-color, #fff); }\n.chip.danger { color: var(--error-color); }\n.link {\n  display: inline-flex; align-items: center; gap: 2px; padding: 4px 2px;\n  background: none; border: none; cursor: pointer; font: inherit; font-size: 13px;\n  color: var(--secondary-text-color);\n}\n.link ha-icon { --mdc-icon-size: 18px; }\n.link.danger { color: var(--error-color); margin-left: auto; }\n.done-head { display: flex; align-items: center; padding: 2px 4px; }\n.done-items { opacity: 0.75; }\n`;\n\n/*\n * The visual editor — what you get when you add the card from the picker rather than\n * writing YAML. Pick the lists, name them, give them an icon and a colour.\n *\n * Built on Home Assistant's own `<ha-form>`, so the entity picker, icon picker and\n * colour picker are the real ones: themed, translated, and behaving the way they do\n * everywhere else. Nothing here is imported — those elements are already defined in a\n * dashboard, which is the only place this element is ever created.\n *\n * Two rules it follows, both learned the hard way in the card itself:\n *\n * * **The forms are built once and only their `.data` is updated.** Rebuilding them on\n *   every keystroke would take focus out of the field being typed into.\n * * **It never emits an invalid config.** A lane with no entity would throw in\n *   `setConfig` and break the live preview, so a lane is only appended once a list has\n *   actually been chosen, and the last one cannot be removed.\n *\n * Anything the editor does not cover — per-lane `hide_add`, `hide_completed` and\n * `default_collapsed\n";
+var styles_default = "/* Styles for the board. Bundled into the card at build time. */\n:host { display: block; }\n[hidden] { display: none !important; }\nha-card { padding: 8px 8px 12px; }\n.card-title {\n  font-size: var(--ha-font-size-l, 20px); font-weight: 500;\n  margin: 8px 8px 4px; color: var(--primary-text-color);\n}\n.error {\n  display: flex; align-items: center; gap: 8px; margin: 4px 8px 8px; padding: 8px 12px;\n  border-radius: 10px; background: rgba(var(--rgb-error-color, 219,68,55), 0.12);\n  color: var(--error-color); font-size: 13px;\n}\n.board {\n  display: grid; gap: 8px;\n  grid-template-columns: repeat(auto-fit, minmax(var(--lane-min, 270px), 1fr));\n}\n.lane {\n  --lane-accent: var(--primary-color);\n  display: flex; flex-direction: column; min-width: 0;\n  border-radius: 12px; padding: 4px 6px 6px;\n  background: var(--secondary-background-color, rgba(127,127,127,0.08));\n  border: 1px solid transparent;\n}\n.lane.drop-target { border-color: var(--lane-accent); }\n.lane.collapsed .items,\n.lane.collapsed .add,\n.lane.collapsed .done-wrap,\n.lane.gone .items,\n.lane.gone .add,\n.lane.gone .done-wrap { display: none; }\n.lane-head {\n  display: flex; align-items: center; gap: 8px; padding: 8px 6px; cursor: pointer;\n  user-select: none;\n}\n.lane-icon { color: var(--lane-accent); --mdc-icon-size: 20px; }\n.lane-title {\n  flex: 1; min-width: 0; font-weight: 500; color: var(--primary-text-color);\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;\n}\n.count {\n  min-width: 22px; padding: 1px 7px; border-radius: 11px; text-align: center;\n  font-size: 12px; font-weight: 600; color: var(--text-primary-color, #fff);\n  background: var(--lane-accent);\n}\n.count.done { background: none; color: var(--success-color, #4caf50); --mdc-icon-size: 20px; }\n.chev { color: var(--secondary-text-color); --mdc-icon-size: 20px; }\n.items { display: flex; flex-direction: column; gap: 2px; }\n.empty, .missing { padding: 10px 8px; color: var(--secondary-text-color); font-size: 13px; }\n.item {\n  display: flex; align-items: center; gap: 6px; padding: 4px 2px 4px 4px;\n  border-radius: 8px; background: var(--card-background-color);\n}\n.item.dragging { opacity: 0.35; }\n.item.completed .summary { text-decoration: line-through; color: var(--secondary-text-color); }\n.item-wrap { display: flex; flex-direction: column; gap: 2px; }\n.check { flex: none; width: 18px; height: 18px; accent-color: var(--lane-accent); }\n.label {\n  flex: 1; min-width: 0; cursor: pointer; padding: 4px 2px;\n  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;\n}\n.summary { color: var(--primary-text-color); font-size: 14px; word-break: break-word; }\n.due {\n  font-size: 11px; padding: 1px 6px; border-radius: 8px; color: var(--secondary-text-color);\n  background: rgba(127,127,127,0.16);\n}\n.tag {\n  font-size: 11px; padding: 0 7px; border-radius: 9px; white-space: nowrap;\n  color: var(--tag-color, var(--secondary-text-color));\n  border: 1px solid currentColor; opacity: .95;\n}\n.due.soon { color: var(--warning-color, #ff9800); }\n.due.overdue { color: var(--error-color); }\n.note { --mdc-icon-size: 14px; color: var(--secondary-text-color); }\n.grip {\n  flex: none; display: grid; place-items: center; width: 30px; height: 30px;\n  color: var(--secondary-text-color); cursor: grab; touch-action: none;\n}\n.grip:active { cursor: grabbing; }\n.ghost {\n  position: fixed; z-index: 10; pointer-events: none; opacity: 0.95;\n  box-shadow: var(--ha-card-box-shadow, 0 4px 14px rgba(0,0,0,0.35));\n}\n.placeholder {\n  height: 30px; border-radius: 8px; border: 2px dashed var(--lane-accent); opacity: 0.7;\n}\n.add { padding: 6px 2px 2px; }\n.add-row { display: flex; align-items: center; gap: 4px; }\n.tag-btn {\n  flex: none; display: grid; place-items: center; width: 30px; height: 30px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: transparent; color: var(--secondary-text-color);\n}\n.tag-btn:hover { background: rgba(127,127,127,.16); color: var(--primary-text-color); }\n.tag-btn ha-icon { --mdc-icon-size: 18px; }\n.tag-suggest { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 2px 0; }\n.tag-chip { padding: 2px 9px; font-size: 12px; }\n/* Off: the tag's own colour, muted right down. On: the colour itself, filled. A tag\n   whose colour is grey is admittedly harder to read either way — worth it for every\n   other tag showing what it will actually look like. */\n.tag-chip {\n  color: var(--tag-color, var(--secondary-text-color));\n  border-color: currentColor; opacity: .45;\n}\n.tag-chip.on {\n  opacity: 1;\n  background: var(--tag-color, var(--lane-accent));\n  border-color: transparent;\n  color: var(--text-primary-color, #fff);\n}\n.no-tags { font-size: 12px; color: var(--secondary-text-color); padding: 2px; }\n.field {\n  flex: 1; min-width: 0; box-sizing: border-box; padding: 7px 10px; border-radius: 8px;\n  border: 1px solid var(--divider-color); background: var(--card-background-color);\n  color: var(--primary-text-color); font: inherit; font-size: 14px;\n}\n.field:focus { outline: none; border-color: var(--lane-accent); }\n.field.short { flex: 0 0 auto; width: 9.5em; }\n.icon-btn {\n  flex: none; display: grid; place-items: center; width: 34px; height: 34px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: var(--lane-accent); color: var(--text-primary-color, #fff);\n}\n.editor {\n  display: flex; flex-direction: column; gap: 6px;\n  padding: 8px; margin: 0 0 2px; border-radius: 8px;\n  background: var(--card-background-color);\n  border: 1px solid var(--divider-color);\n}\n.editor .row { display: flex; gap: 6px; align-items: flex-start; }\n.moveto { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }\n.moveto-label { font-size: 12px; color: var(--secondary-text-color); }\n.actions { display: flex; align-items: center; gap: 6px; }\n.spacer { flex: 1; }\n.chip {\n  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;\n  border-radius: 14px; border: 1px solid var(--divider-color); cursor: pointer;\n  background: transparent; color: var(--primary-text-color); font: inherit; font-size: 13px;\n}\n.chip ha-icon { --mdc-icon-size: 16px; }\n.chip.primary { background: var(--lane-accent); border-color: transparent; color: var(--text-primary-color, #fff); }\n.chip.danger { color: var(--error-color); }\n.link {\n  display: inline-flex; align-items: center; gap: 2px; padding: 4px 2px;\n  background: none; border: none; cursor: pointer; font: inherit; font-size: 13px;\n  color: var(--secondary-text-color);\n}\n.link ha-icon { --mdc-icon-size: 18px; }\n.link.danger { color: var(--error-color); margin-left: auto; }\n.done-head { display: flex; align-items: center; padding: 2px 4px; }\n.done-items { opacity: 0.75; }\n`;\n\n/*\n * The visual editor — what you get when you add the card from the picker rather than\n * writing YAML. Pick the lists, name them, give them an icon and a colour.\n *\n * Built on Home Assistant's own `<ha-form>`, so the entity picker, icon picker and\n * colour picker are the real ones: themed, translated, and behaving the way they do\n * everywhere else. Nothing here is imported — those elements are already defined in a\n * dashboard, which is the only place this element is ever created.\n *\n * Two rules it follows, both learned the hard way in the card itself:\n *\n * * **The forms are built once and only their `.data` is updated.** Rebuilding them on\n *   every keystroke would take focus out of the field being typed into.\n * * **It never emits an invalid config.** A lane with no entity would throw in\n *   `setConfig` and break the live preview, so a lane is only appended once a list has\n *   actually been chosen, and the last one cannot be removed.\n *\n * Anything the editor does not cover — per-lane `hide_add`, `hide_completed` and\n * `default_collapsed\n";
 
 // src/card.js
 var STORE = "todo-kanban.collapsed.";
@@ -738,6 +766,19 @@ var TodoKanbanCard = class extends HTMLElement {
     const lane = (this._config.lanes || []).find((l) => l.entity === entity) || {};
     const parsed = this._opt(lane, "enable_tags") ? splitTags(item.summary) : { text: item.summary, tags: [] };
     const palette = this._config.tags || {};
+    const paint = (summary) => {
+      const shown = this._opt(lane, "enable_tags") ? splitTags(summary) : { text: summary, tags: [] };
+      label.replaceChildren(
+        el("span", { class: "summary", text: shown.text }),
+        ...shown.tags.map((tag) => {
+          const chip = el("span", { class: "tag", text: tag });
+          chip.style.setProperty("--tag-color", tagColor(tag, palette));
+          return chip;
+        }),
+        ...due ? [el("span", { class: `due ${due.state}`, text: due.text })] : [],
+        ...item.description ? [icon("mdi:text", "note")] : []
+      );
+    };
     const label = el("div", {
       class: "label",
       onclick: () => {
@@ -750,7 +791,7 @@ var TodoKanbanCard = class extends HTMLElement {
       // something should not require a trip to the editor first.
       ...parsed.tags.map((tag) => {
         const chip = el("span", { class: "tag", text: tag });
-        if (palette[tag]) chip.style.setProperty("--tag-color", computeCssColor(palette[tag]));
+        chip.style.setProperty("--tag-color", tagColor(tag, palette));
         return chip;
       }),
       due ? el("span", { class: `due ${due.state}`, text: due.text }) : null,
@@ -763,17 +804,19 @@ var TodoKanbanCard = class extends HTMLElement {
     const wrap = el(
       "div",
       { class: "item-wrap", "data-uid": item.uid },
-      [row, this._renderEditor(entity, item)]
+      [row, this._renderEditor(entity, item, paint)]
     );
     return wrap;
   }
-  _renderEditor(entity, item) {
+  _renderEditor(entity, item, preview) {
     const key = `edit.${item.uid}`;
     const name = el("input", {
       type: "text",
       class: "field",
       value: item.summary,
       "data-focus": `${key}.name`,
+      // Typing shows on the item as you go, the same as toggling a chip does.
+      oninput: (ev) => preview(ev.target.value),
       onkeydown: (ev) => {
         if (ev.key === "Enter") save();
         if (ev.key === "Escape") close();
@@ -793,6 +836,7 @@ var TodoKanbanCard = class extends HTMLElement {
     });
     desc.value = item.description || "";
     const close = () => {
+      preview(item.summary);
       this._editing = null;
       this._render();
     };
@@ -814,7 +858,7 @@ var TodoKanbanCard = class extends HTMLElement {
       el("div", { class: "row" }, [dueInput, desc]),
       known.length ? el("div", { class: "moveto" }, [
         el("span", { class: "moveto-label", text: "Tags" }),
-        ...known.map((tag) => this._tagChip(tag, name))
+        ...known.map((tag) => this._tagChip(tag, name, (value) => preview(value)))
       ]) : null,
       others.length ? el("div", { class: "moveto" }, [
         el("span", { class: "moveto-label", text: "Move to" }),
@@ -862,6 +906,14 @@ var TodoKanbanCard = class extends HTMLElement {
     return [...found].sort((a, b) => a.localeCompare(b));
   }
   // A chip that puts a tag into, or takes it out of, a text field.
+  /*
+   * A chip that puts a tag into, or takes it out of, a text field.
+   *
+   * It wears the tag's own colour when it is on and a muted version of it when it is
+   * off, rather than the lane's accent — the point of the row is to show what the tags
+   * look like. A tag whose colour happens to be grey is then harder to read as on or
+   * off, which is the price of every other tag being obvious.
+   */
   _tagChip(tag, field, onChange) {
     const chip = el("button", {
       class: "chip tag-chip",
@@ -874,6 +926,7 @@ var TodoKanbanCard = class extends HTMLElement {
         field.focus();
       }
     }, [tag]);
+    chip.style.setProperty("--tag-color", tagColor(tag, this._config.tags || {}));
     if (splitTags(field.value).tags.includes(tag)) chip.classList.add("on");
     return chip;
   }
@@ -1195,7 +1248,7 @@ var TodoKanbanCardEditor = class extends HTMLElement {
     if (!tag) return;
     const rows = this._tagRows();
     if (rows.some((r) => r.tag === tag)) return;
-    rows.push({ tag, color: "" });
+    rows.push({ tag, color: nextFreeTagColor(this._config.tags || {}) });
     this._emitTags(rows);
   }
   _removeTag(index) {
@@ -1321,7 +1374,7 @@ var TodoKanbanCardEditor = class extends HTMLElement {
 };
 
 // src/version.js
-var VERSION = "1.3.0-beta.4";
+var VERSION = "1.3.0-beta.5";
 
 // src/index.js
 if (!customElements.get("todo-kanban-card-editor")) {
