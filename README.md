@@ -143,7 +143,8 @@ lanes: [...]
 ```
 
 Any tag you have not given a colour still gets one, and no two tags on a board share a
-colour while there are colours left. It is derived from the tag's name, so it is the same
+colour while there are colours left — past twelve tags it starts reusing them rather
+than running out. It is derived from the tag's name, so it is the same
 on every device and after every reload. Tagging something never requires a trip to the
 editor first — what is there is for overriding what it picked.
 
@@ -262,7 +263,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 
 ```bash
 npm run build   # src/ -> todo-kanban-card.js
-npm test        # builds first, then 129 assertions in jsdom
+npm test        # builds first, then 140 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)
