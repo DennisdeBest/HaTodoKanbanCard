@@ -142,10 +142,13 @@ tags:
 lanes: [...]
 ```
 
-Any tag you have not given a colour still gets one — derived from its name, so it is the
-same on every device and two tags rarely look alike. Tagging something never requires a
-trip to the editor first; the colours there are for when you want to override what it
-picked.
+Any tag you have not given a colour still gets one, and no two tags on a board share a
+colour while there are colours left. It is derived from the tag's name, so it is the same
+on every device and after every reload. Tagging something never requires a trip to the
+editor first — what is there is for overriding what it picked.
+
+The editor lists **every tag in play**, including ones you have only ever typed into an
+item, each marked *auto* until you choose a colour for it.
 
 **You do not have to type them in full, either.** Start typing `#dai` and the box
 suggests matching tags — click one, or press <kbd>Tab</kbd> for the first, and the word
@@ -259,7 +262,7 @@ Three boards, a light/dark toggle, and the YAML for each one underneath it.
 
 ```bash
 npm run build   # src/ -> todo-kanban-card.js
-npm test        # builds first, then 127 assertions in jsdom
+npm test        # builds first, then 129 assertions in jsdom
 npm run demo    # the browser harness, for anything involving a pointer
 npm run shots   # re-capture the README images (needs Chrome and ffmpeg)
 npm run shots:editor   # the editor screenshot (needs a real HA: HA_URL, HA_TOKEN)

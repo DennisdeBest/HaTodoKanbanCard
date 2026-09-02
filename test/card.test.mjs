@@ -872,3 +872,46 @@ describe("editing an item updates it as you go", () => {
     assert.ok(!byName.frozen.classList.contains("on"));
   });
 });
+
+describe("automatic tag colours", () => {
+  const many = {
+    "todo.urgent": [{ uid: "m1", summary: "a #kek #lol #zzz #alpha", status: "needs_action" }],
+    "todo.normal": [], "todo.later": [],
+  };
+  const colours = ($$) =>
+    [...$$(".lane")[0].querySelectorAll(".tag")].map((c) => c.style.getPropertyValue("--tag-color"));
+
+  test("no two tags share a colour while there are colours left", async () => {
+    const { $$ } = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(many));
+    await tick();
+    const got = colours($$);
+    assert.equal(got.length, 4);
+    assert.equal(new Set(got).size, 4, `expected four distinct colours, got ${JSON.stringify(got)}`);
+  });
+
+  test("an automatic colour avoids one a configured tag has taken", async () => {
+    const first = fixture({ default_collapsed: false, enable_tags: true }, structuredClone(many));
+    await tick();
+    const before = Object.fromEntries(
+      [...first.$$(".lane")[0].querySelectorAll(".tag")]
+        .map((c) => [c.textContent, c.style.getPropertyValue("--tag-color")]));
+    document.body.innerHTML = "";
+
+    const { $$ } = fixture(
+      { default_collapsed: false, enable_tags: true, tags: { alpha: before.kek.replace(/var\(--|-color\)/g, "") } },
+      structuredClone(many));
+    await tick();
+    const got = colours($$);
+    assert.equal(new Set(got).size, 4, "a configured colour should push the automatic ones aside");
+  });
+
+  test("the same tag keeps its colour across renders", async () => {
+    const { $$, subs, items } = fixture({ default_collapsed: false, enable_tags: true },
+      structuredClone(many));
+    await tick();
+    const before = colours($$);
+    subs.find(([, e]) => e === "todo.urgent")[0]({ items: items["todo.urgent"] });
+    await tick();
+    assert.deepEqual(colours($$), before);
+  });
+});

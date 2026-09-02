@@ -32,17 +32,42 @@ function hashOf(value) {
   return hash;
 }
 
-// The colour a tag should be drawn in: what the config says, or a stable one derived
-// from its name so that an unconfigured tag still arrives looking like something.
-export function tagColor(tag, configured) {
-  const set = (configured || {})[tag];
-  if (set) return computeCssColor(set);
-  return computeCssColor(TAG_PALETTE[hashOf(String(tag)) % TAG_PALETTE.length]);
+/*
+ * Automatic colours for the tags nobody has coloured by hand.
+ *
+ * A tag's preferred slot comes from a hash of its name, so it keeps the same colour
+ * across devices and reloads. Where two tags want the same slot, or where the slot is
+ * already spoken for by a configured tag, the next free one is taken instead — walking
+ * the tags in a stable order so the result does not depend on who was looked up first.
+ * Twelve colours means a thirteenth tag has to repeat one; it is a shopping list, not a
+ * colour scheme.
+ */
+export function autoTagColors(tags, configured) {
+  const chosen = configured || {};
+  const taken = new Set(Object.values(chosen).filter(Boolean));
+  const out = {};
+  for (const tag of [...new Set(tags || [])].sort((a, b) => a.localeCompare(b))) {
+    if (chosen[tag]) continue;
+    const start = hashOf(String(tag)) % TAG_PALETTE.length;
+    let pick = TAG_PALETTE[start];
+    for (let i = 0; i < TAG_PALETTE.length; i++) {
+      const candidate = TAG_PALETTE[(start + i) % TAG_PALETTE.length];
+      if (!taken.has(candidate)) { pick = candidate; break; }
+    }
+    taken.add(pick);
+    out[tag] = pick;
+  }
+  return out;
 }
 
-// The first palette colour no other tag has taken — what the editor prefills a new row
-// with, so a list of tags ends up looking varied without anyone choosing.
-export function nextFreeTagColor(configured) {
-  const taken = new Set(Object.values(configured || {}).filter(Boolean));
-  return TAG_PALETTE.find((c) => !taken.has(c)) || TAG_PALETTE[0];
+// The colour a tag is drawn in: the configured one, or its automatic slot. Pass the
+// full set of tags in play and no two of them will land on the same colour.
+export function tagColor(tag, configured, allTags) {
+  const set = (configured || {})[tag];
+  if (set) return computeCssColor(set);
+  if (allTags && allTags.length) {
+    const auto = autoTagColors(allTags, configured);
+    if (auto[tag]) return computeCssColor(auto[tag]);
+  }
+  return computeCssColor(TAG_PALETTE[hashOf(String(tag)) % TAG_PALETTE.length]);
 }

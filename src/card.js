@@ -712,6 +712,7 @@ export class TodoKanbanCard extends HTMLElement {
       ? splitTags(item.summary)
       : { text: item.summary, tags: [] };
     const palette = this._config.tags || {};
+    const known = this._knownTags();
 
     // Rebuilt in place while the editor is open, so toggling a tag or typing a name is
     // reflected on the item straight away rather than only once it is saved.
@@ -723,7 +724,7 @@ export class TodoKanbanCard extends HTMLElement {
         el("span", { class: "summary", text: shown.text }),
         ...shown.tags.map((tag) => {
           const chip = el("span", { class: "tag", text: tag });
-          chip.style.setProperty("--tag-color", tagColor(tag, palette));
+          chip.style.setProperty("--tag-color", tagColor(tag, palette, known));
           return chip;
         }),
         ...(due ? [el("span", { class: `due ${due.state}`, text: due.text })] : []),
@@ -743,7 +744,7 @@ export class TodoKanbanCard extends HTMLElement {
       // something should not require a trip to the editor first.
       ...parsed.tags.map((tag) => {
         const chip = el("span", { class: "tag", text: tag });
-        chip.style.setProperty("--tag-color", tagColor(tag, palette));
+        chip.style.setProperty("--tag-color", tagColor(tag, palette, known));
         return chip;
       }),
       due ? el("span", { class: `due ${due.state}`, text: due.text }) : null,
@@ -873,7 +874,7 @@ export class TodoKanbanCard extends HTMLElement {
         field.focus();
       },
     }, [tag]);
-    chip.style.setProperty("--tag-color", tagColor(tag, this._config.tags || {}));
+    chip.style.setProperty("--tag-color", tagColor(tag, this._config.tags || {}, this._knownTags()));
     if (splitTags(field.value).tags.includes(tag)) chip.classList.add("on");
     return chip;
   }

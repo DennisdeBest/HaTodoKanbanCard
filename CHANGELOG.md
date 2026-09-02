@@ -2,10 +2,15 @@
 
 ## 1.3.0
 
-- **Every tag gets a colour, whether or not you chose one.** An unconfigured tag is
-  given a stable colour derived from its name, so tags look distinct from the moment
-  they are typed rather than all arriving grey. Adding one in the editor prefills a
-  colour nothing else has taken, ready to adjust.
+- **Every tag gets a colour, whether or not you chose one.** A tag's preferred colour
+  comes from a hash of its name, so it is the same on every device and after every
+  reload; where two tags want the same one, or a configured tag has taken it, the next
+  free colour is used instead. So a board of tags arrives looking varied without anyone
+  choosing anything.
+- **The editor lists every tag in play**, not just the ones already given a colour — a
+  tag invented while adding a task appears there to be recoloured, marked *auto* until
+  you pick something. It watches the lists, so a tag typed while the dialog is open turns
+  up without reopening it.
 - **The tag chips in an item's editor wear the tag's own colour** — filled when the tag
   is on, faded when it is off — rather than the lane's accent, so the row shows what the
   tags will actually look like.

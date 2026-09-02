@@ -82,10 +82,10 @@ describe("the card exposes an editor", () => {
 });
 
 describe("the editor form", () => {
-  test("one form per lane, plus the card form and both add pickers", () => {
-    const { laneForms, cardForm, addLaneForm, addTagForm } = editor();
+  test("one form per lane, plus the card form and the add picker", () => {
+    const { laneForms, cardForm, addLaneForm } = editor();
     assert.equal(laneForms().length, 3);
-    assert.ok(cardForm() && addLaneForm() && addTagForm());
+    assert.ok(cardForm() && addLaneForm());
   });
 
   test("asks for a todo entity picker, an icon and a colour", () => {
@@ -216,118 +216,115 @@ describe("colours", () => {
 });
 
 describe("tag colours in the editor", () => {
-  // The editor asks each list for its items to build the autocomplete, so the mock has
-  // to answer todo/item/list rather than only carry states.
-  function tagEditor(config) {
-    const items = {
+  /*
+   * The editor watches the configured lists, so this mock has to answer
+   * todo/item/subscribe — which is also how a tag invented while the dialog is open
+   * turns up in it.
+   */
+  function tagEditor(config, items) {
+    const seeded = items || {
       "todo.urgent": [{ uid: "1", summary: "Milk #dairy", status: "needs_action" }],
-      "todo.normal": [
-        { uid: "2", summary: "#frozen Peas #veg", status: "needs_action" },
-        { uid: "3", summary: "Plain item", status: "needs_action" },
-      ],
+      "todo.normal": [{ uid: "2", summary: "#frozen Peas #veg", status: "needs_action" }],
       "todo.later": [{ uid: "4", summary: "Pan #kitchen", status: "needs_action" }],
     };
     const calls = [];
-    const { hass } = makeHass(items, calls);
+    const { hass, subs } = makeHass(seeded, calls);
     const el = document.createElement("todo-kanban-card-editor");
     el.setConfig(structuredClone(config));
     el.hass = hass;
     document.body.appendChild(el);
     const changes = [];
     el.addEventListener("config-changed", (ev) => changes.push(ev.detail.config));
-    const forms = () => [...el.shadowRoot.querySelectorAll("ha-form")];
-    const names = (f) => f.schema.flatMap((x) => (x.schema ? x.schema : [x])).map((x) => x.name);
-    const tagForms = () => forms().filter((f) => names(f).includes("tag"));
-    const addTagForm = () => forms().find((f) => names(f).includes("add_tag"));
-    return { el, changes, tagForms, addTagForm };
+    const rows = () => [...el.shadowRoot.querySelectorAll(".tag-row")];
+    const rowFor = (tag) => rows().find((r) => r.querySelector(".tag-preview").textContent === tag);
+    return { el, changes, rows, rowFor, subs };
   }
 
   const BASE = { lanes: [{ entity: "todo.urgent" }, { entity: "todo.normal" }, { entity: "todo.later" }] };
 
-  test("suggests the tags people have actually written", async () => {
-    const { addTagForm } = tagEditor(BASE);
+  test("lists every tag written on an item, not only the configured ones", async () => {
+    const { rows } = tagEditor(BASE);
     await tick(40);
-    assert.deepEqual(addTagForm().schema[0].selector.select.options,
+    assert.deepEqual(rows().map((r) => r.querySelector(".tag-preview").textContent),
       ["dairy", "frozen", "kitchen", "veg"]);
   });
 
-  test("the suggestion field accepts a tag that does not exist yet", async () => {
-    const { addTagForm } = tagEditor(BASE);
+  test("a configured tag with nothing using it is listed too", async () => {
+    const { rows } = tagEditor({ ...BASE, tags: { retired: "grey" } });
     await tick(40);
-    assert.equal(addTagForm().schema[0].selector.select.custom_value, true);
+    assert.ok(rows().some((r) => r.querySelector(".tag-preview").textContent === "retired"));
   });
 
-  test("configured tags are suggested too, even if nothing uses them yet", async () => {
-    const { addTagForm } = tagEditor({ ...BASE, tags: { retired: "grey" } });
+  test("an uncoloured tag is marked automatic and carries no colour in the form", async () => {
+    const { rowFor } = tagEditor(BASE);
     await tick(40);
-    assert.ok(addTagForm().schema[0].selector.select.options.includes("retired"));
+    const row = rowFor("dairy");
+    assert.ok(row.querySelector(".auto-note"), "expected the automatic marker");
+    assert.deepEqual(row.querySelector("ha-form").data, { color: "" });
   });
 
-  test("one row per configured tag, prefilled", async () => {
-    const { tagForms } = tagEditor({ ...BASE, tags: { dairy: "blue", veg: "green" } });
+  test("the preview chip wears the colour the tag is drawn in", async () => {
+    const { rowFor } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
     await tick(40);
-    assert.equal(tagForms().length, 2);
-    assert.deepEqual(tagForms()[0].data, { tag: "dairy", color: "blue" });
-    assert.deepEqual(tagForms()[1].data, { tag: "veg", color: "green" });
+    assert.equal(rowFor("dairy").querySelector(".tag-preview").style.getPropertyValue("--tag-color"),
+      "var(--blue-color)");
+    // an automatic one still gets something, just not a configured one
+    assert.match(rowFor("veg").querySelector(".tag-preview").style.getPropertyValue("--tag-color"),
+      /^var\(--[a-z-]+-color\)$/);
   });
 
-  test("picking a tag adds a row, already on a colour", async () => {
-    const { addTagForm, changes } = tagEditor(BASE);
+  test("choosing a colour writes it against the tag", async () => {
+    const { rowFor, changes } = tagEditor(BASE);
     await tick(40);
-    addTagForm().emit({ add_tag: "dairy" });
-    assert.deepEqual(Object.keys(changes.at(-1).tags), ["dairy"]);
-    assert.ok(changes.at(-1).tags.dairy, "a new tag should arrive with a colour to adjust");
-  });
-
-  test("a second tag does not get the same colour as the first", async () => {
-    const { addTagForm, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
-    await tick(40);
-    addTagForm().emit({ add_tag: "veg" });
-    const tags = changes.at(-1).tags;
-    assert.notEqual(tags.veg, tags.dairy);
-  });
-
-  test("the same tag cannot be added twice", async () => {
-    const { addTagForm, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
-    await tick(40);
-    addTagForm().emit({ add_tag: "dairy" });
-    assert.equal(changes.length, 0);
-  });
-
-  test("setting a colour writes it against the tag", async () => {
-    const { tagForms, changes } = tagEditor({ ...BASE, tags: { dairy: "" } });
-    await tick(40);
-    tagForms()[0].emit({ tag: "dairy", color: "purple" });
+    rowFor("dairy").querySelector("ha-form").emit({ color: "purple" });
     assert.deepEqual(changes.at(-1).tags, { dairy: "purple" });
   });
 
-  test("renaming a tag row replaces the key rather than adding one", async () => {
-    const { tagForms, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+  test("an automatic colour is never written into the config", async () => {
+    const { rowFor, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
     await tick(40);
-    tagForms()[0].emit({ tag: "milk", color: "blue" });
-    assert.deepEqual(changes.at(-1).tags, { milk: "blue" });
+    rowFor("veg").querySelector("ha-form").emit({ color: "" });
+    assert.deepEqual(changes.at(-1).tags, { dairy: "blue" }, "only chosen colours belong in config");
   });
 
-  test("removing the last tag drops the key entirely", async () => {
-    const { el, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+  test("resetting a tag puts it back to automatic", async () => {
+    const { rowFor, changes } = tagEditor({ ...BASE, tags: { dairy: "blue", veg: "green" } });
     await tick(40);
-    const rows = [...el.shadowRoot.querySelectorAll(".lane-row")];
-    rows.at(-1).querySelector(".tool").click();
-    assert.ok(!("tags" in changes.at(-1)), "an empty map should not be written out");
+    rowFor("dairy").querySelector(".tool").click();
+    assert.deepEqual(changes.at(-1).tags, { veg: "green" });
   });
 
-  test("a nameless tag is never written", async () => {
-    const { tagForms, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+  test("resetting the last one drops the key entirely", async () => {
+    const { rowFor, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
     await tick(40);
-    tagForms()[0].emit({ tag: "", color: "red" });
-    assert.equal(changes.length, 0);
+    rowFor("dairy").querySelector(".tool").click();
+    assert.ok(!("tags" in changes.at(-1)));
   });
 
-  test("everything the tag editor emits is still a config the card accepts", async () => {
-    const { addTagForm, tagForms, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+  test("a tag invented while the dialog is open shows up in it", async () => {
+    const { rows, subs } = tagEditor(BASE);
     await tick(40);
-    addTagForm().emit({ add_tag: "veg" });
-    tagForms()[0].emit({ tag: "dairy", color: "cyan" });
+    assert.ok(!rows().some((r) => r.querySelector(".tag-preview").textContent === "baking"));
+    subs.find(([, e]) => e === "todo.urgent")[0]({
+      items: [{ uid: "9", summary: 'Flour #"baking"', status: "needs_action" }],
+    });
+    await tick(40);
+    assert.ok(rows().some((r) => r.querySelector(".tag-preview").textContent === "baking"),
+      "a tag typed while the editor is open should appear without reopening it");
+  });
+
+  test("says so when there are no tags at all", async () => {
+    const { el, rows } = tagEditor(BASE, { "todo.urgent": [], "todo.normal": [], "todo.later": [] });
+    await tick(40);
+    assert.equal(rows().length, 0);
+    assert.match(el.shadowRoot.textContent, /No tags yet/);
+  });
+
+  test("everything it emits is still a config the card accepts", async () => {
+    const { rowFor, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
+    await tick(40);
+    rowFor("veg").querySelector("ha-form").emit({ color: "cyan" });
+    rowFor("dairy").querySelector(".tool").click();
     assert.ok(changes.length >= 2);
     for (const config of changes) {
       assert.doesNotThrow(() => document.createElement("todo-kanban-card").setConfig(config));

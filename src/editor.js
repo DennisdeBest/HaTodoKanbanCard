@@ -1,6 +1,6 @@
 import { el } from "./dom.js";
 import { splitTags } from "./tags.js";
-import { nextFreeTagColor } from "./colors.js";
+import { tagColor } from "./colors.js";
 import EDITOR_STYLE from "./editor-styles.css";
 
 const EDITOR_LABELS = {
@@ -15,7 +15,6 @@ const EDITOR_LABELS = {
   color: "Colour",
   add: "Add a list",
   tag: "Tag",
-  add_tag: "Add a tag",
 };
 
 const CARD_SCHEMA = [
@@ -67,25 +66,8 @@ const ADD_SCHEMA = [{ name: "add", selector: { entity: { domain: "todo" } } }];
  * options are the tags already written on items across the configured lists, but a tag
  * that does not exist yet can simply be typed.
  */
-const tagSchema = (known) => [
-  {
-    name: "",
-    type: "grid",
-    schema: [
-      {
-        name: "tag",
-        selector: { select: { mode: "dropdown", custom_value: true, sort: true, options: known } },
-      },
-      { name: "color", selector: { ui_color: { include_none: true, default_color: "none" } } },
-    ],
-  },
-];
-
-const addTagSchema = (known) => [
-  {
-    name: "add_tag",
-    selector: { select: { mode: "dropdown", custom_value: true, sort: true, options: known } },
-  },
+const tagSchema = [
+  { name: "color", selector: { ui_color: { include_none: true, default_color: "none" } } },
 ];
 
 export class TodoKanbanCardEditor extends HTMLElement {
@@ -94,46 +76,66 @@ export class TodoKanbanCardEditor extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._config = { lanes: [] };
     this._built = false;
-    this._known = [];     // tags already in use, for the autocomplete
+    this._known = [];     // every tag in play: configured, or written on an item
+    this._seen = {};      // entity -> its items, from the subscriptions
+    this._subs = [];
+  }
+
+  disconnectedCallback() {
+    this._unsubscribe();
   }
 
   /*
-   * Read every configured list and collect the tags people have actually written, so
-   * the editor suggests `#dairy` rather than making you remember how you spelled it.
-   * Items are not in `hass.states` — only the outstanding count is — so this has to ask
-   * for them.
+   * Watch the configured lists, so a tag typed into an item while this dialog is open
+   * turns up here without reopening it. `todo/item/subscribe` pushes the current items
+   * immediately as well as on every change, so this covers the first load too.
    */
-  async _loadKnownTags() {
+  _subscribe() {
+    this._unsubscribe();
     if (!this._hass || !this._config) return;
+    for (const lane of this._config.lanes || []) {
+      const p = this._hass.connection.subscribeMessage(
+        (msg) => {
+          this._seen[lane.entity] = (msg && msg.items) || [];
+          this._refreshKnown();
+        },
+        { type: "todo/item/subscribe", entity_id: lane.entity }
+      );
+      p.catch(() => { /* a list that cannot be read contributes no tags */ });
+      this._subs.push(p);
+    }
+  }
+
+  _unsubscribe() {
+    for (const p of this._subs) p.then((unsub) => unsub && unsub()).catch(() => {});
+    this._subs = [];
+  }
+
+  _refreshKnown() {
     const found = new Set(Object.keys(this._config.tags || {}));
-    await Promise.all((this._config.lanes || []).map(async (lane) => {
-      try {
-        const res = await this._hass.callWS({ type: "todo/item/list", entity_id: lane.entity });
-        for (const item of (res && res.items) || []) {
-          for (const tag of splitTags(item.summary).tags) found.add(tag);
-        }
-      } catch (err) {
-        /* a list that cannot be read just contributes no suggestions */
+    for (const items of Object.values(this._seen)) {
+      for (const item of items || []) {
+        for (const tag of splitTags(item.summary).tags) found.add(tag);
       }
-    }));
+    }
     const known = [...found].sort((a, b) => a.localeCompare(b));
     if (known.join("\u0000") === this._known.join("\u0000")) return;
     this._known = known;
-    this._built = false;   // the options changed, so the forms need rebuilding
+    this._built = false;   // the rows and the options both change
     this._render();
   }
 
   setConfig(config) {
     this._config = { ...config, lanes: [...((config && config.lanes) || [])] };
     this._render();
-    this._loadKnownTags();
+    this._subscribe();
   }
 
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
     this._render();
-    if (first) this._loadKnownTags();
+    if (first) this._subscribe();
   }
 
   get hass() {
@@ -197,45 +199,45 @@ export class TodoKanbanCardEditor extends HTMLElement {
 
   // The config carries `tags` as a map, which is the readable thing in YAML; the editor
   // needs an ordered list to render rows from, so it converts in both directions.
+  /*
+   * A row for every tag in play — the ones given a colour and the ones merely written
+   * on an item — so a tag invented while adding a task can be recoloured here without
+   * having to be picked out of a dropdown first. An uncoloured tag shows the colour it
+   * is being drawn in, and only becomes configuration once it is changed.
+   */
   _tagRows() {
-    return Object.entries(this._config.tags || {}).map(([tag, color]) => ({ tag, color }));
+    const configured = this._config.tags || {};
+    return this._known.map((tag) => ({
+      tag,
+      color: configured[tag] || "",
+      automatic: !configured[tag],
+    }));
   }
 
   _emitTags(rows) {
     const next = { ...this._config };
     const tags = {};
     for (const row of rows) {
-      if (!row.tag) continue;
-      tags[row.tag] = row.color || "";
+      if (!row.tag || !row.color) continue;   // an automatic colour is not configuration
+      tags[row.tag] = row.color;
     }
     if (Object.keys(tags).length) next.tags = tags;
     else delete next.tags;
     this._emit(next);
   }
 
-  _tagChanged(index, ev) {
+  _tagChanged(tag, ev) {
     ev.stopPropagation();
-    const rows = this._tagRows();
-    const value = ev.detail.value;
-    if (!value.tag) return;                      // never write a nameless tag
-    rows[index] = { tag: value.tag, color: value.color || "" };
+    const rows = this._tagRows().map((row) =>
+      row.tag === tag ? { ...row, color: ev.detail.value.color || "" } : row);
     this._emitTags(rows);
   }
 
-  _addTag(ev) {
-    ev.stopPropagation();
-    const tag = ev.detail.value && ev.detail.value.add_tag;
-    if (!tag) return;
-    const rows = this._tagRows();
-    if (rows.some((r) => r.tag === tag)) return; // already configured
-    // Start it on a colour nothing else has taken, so a list of tags ends up varied
-    // without anyone having to choose. Adjustable right there in the row.
-    rows.push({ tag, color: nextFreeTagColor(this._config.tags || {}) });
-    this._emitTags(rows);
-  }
-
-  _removeTag(index) {
-    this._emitTags(this._tagRows().filter((_, i) => i !== index));
+  // Back to the colour the card picks for it. The tag itself lives in the item text,
+  // so there is nothing here to delete.
+  _resetTag(tag) {
+    this._emitTags(this._tagRows().map((row) =>
+      row.tag === tag ? { ...row, color: "" } : row));
   }
 
   _addLane(ev) {
@@ -293,13 +295,12 @@ export class TodoKanbanCardEditor extends HTMLElement {
       this._addForm.hass = this._hass;
       this._tagForms.forEach((form, i) => {
         form.hass = this._hass;
-        form.data = { ...tagRows[i] };
+        form.data = { color: tagRows[i].color };
       });
       if (this._tagsForm) {
         this._tagsForm.hass = this._hass;
         this._tagsForm.data = { enable_tags: !!this._config.enable_tags };
       }
-      if (this._addTagForm) this._addTagForm.hass = this._hass;
       return;
     }
 
@@ -348,19 +349,25 @@ export class TodoKanbanCardEditor extends HTMLElement {
     root.appendChild(this._tagsForm);
 
     this._tagForms = [];
-    tagRows.forEach((row, i) => {
-      const form = this._form(tagSchema(this._known), { ...row }, (ev) => this._tagChanged(i, ev));
+    if (!tagRows.length) {
+      root.appendChild(el("p", { class: "hint", text:
+        "No tags yet. Write one into an item — \u201cMilk #dairy\u201d — and it will appear "
+        + "here to colour." }));
+    }
+    tagRows.forEach((row) => {
+      const form = this._form(tagSchema, { color: row.color }, (ev) => this._tagChanged(row.tag, ev));
       this._tagForms.push(form);
-      root.appendChild(el("div", { class: "lane-row" }, [
-        el("div", { class: "lane-tools" }, [
-          this._button("mdi:delete-outline", "Remove this tag", () => this._removeTag(i)),
-        ]),
+      const preview = el("span", { class: "tag-preview", text: row.tag });
+      preview.style.setProperty("--tag-color", tagColor(row.tag, this._config.tags || {}, this._known));
+      root.appendChild(el("div", { class: "lane-row tag-row" }, [
+        preview,
         form,
+        row.automatic
+          ? el("span", { class: "auto-note", title: "Chosen automatically", text: "auto" })
+          : this._button("mdi:backup-restore", "Back to the automatic colour",
+              () => this._resetTag(row.tag)),
       ]));
     });
-
-    this._addTagForm = this._form(addTagSchema(this._known), { add_tag: "" }, (ev) => this._addTag(ev));
-    root.appendChild(el("div", { class: "add-row" }, [this._addTagForm]));
 
     root.appendChild(el("p", { class: "hint", text:
       "Per-list overrides for folding, the add box and completed items are available " +
