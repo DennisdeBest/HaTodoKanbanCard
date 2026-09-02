@@ -1,4 +1,4 @@
-/* todo-kanban-card 1.3.0-beta.8 — https://github.com/DennisdeBest/HaTodoKanbanCard
+/* todo-kanban-card 1.3.0 — https://github.com/DennisdeBest/HaTodoKanbanCard
  *
  * BUILT FILE — do not edit. The source is in src/; run `npm run build`.
  * MIT licensed. Bundled from src/ so that HACS, which installs exactly one file,
@@ -1422,7 +1422,7 @@ var TodoKanbanCardEditor = class extends HTMLElement {
 };
 
 // src/version.js
-var VERSION = "1.3.0-beta.8";
+var VERSION = "1.3.0";
 
 // src/index.js
 if (!customElements.get("todo-kanban-card-editor")) {

@@ -41,6 +41,7 @@ const SHOTS = [
   { file: "chores.png",        only: "chores",   theme: "light", width: 1180 },
   { file: "mobile.png",        only: "shopping", theme: "light", width: 420 },
   { file: "editor.png",        only: "shopping", theme: "light", width: 1180, editor: true },
+  { file: "tags.png",          only: "shopping", theme: "light", width: 1180, tags: true },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -60,6 +61,20 @@ async function shootCard(page, path) {
   console.log("  ", path.replace(ROOT, ""));
 }
 
+// The tag suggestions, mid-type: the row narrowed to what matches "#s".
+async function openTagPicker(page) {
+  await page.evaluate(() => {
+    const card = document.querySelector("todo-kanban-card");
+    const lane = card.shadowRoot.querySelectorAll(".lane")[1];
+    const field = lane.querySelector(".add .field");
+    field.focus();
+    field.value = "Cumin #s";
+    field.setSelectionRange(field.value.length, field.value.length);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await sleep(200);
+}
+
 async function openEditor(page) {
   await page.evaluate(() => {
     const card = document.querySelector("todo-kanban-card");
@@ -76,6 +91,7 @@ async function stills(browser) {
     await page.goto(`${BASE}?only=${shot.only}&bare&theme=${shot.theme}`, { waitUntil: "networkidle0" });
     await sleep(250);
     if (shot.editor) await openEditor(page);
+    if (shot.tags) await openTagPicker(page);
     await shootCard(page, join(DOCS, shot.file));
     await page.close();
   }

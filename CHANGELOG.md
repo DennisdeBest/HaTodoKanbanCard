@@ -2,53 +2,44 @@
 
 ## 1.3.0
 
+**Tags.** Write one into an item — `Milk #dairy` — and the card shows *Milk* with a
+`dairy` chip beside it.
+
+- **Off by default.** `enable_tags: true` switches them on, per card or per lane. A `#`
+  in an item may well be there for another reason — `Call #12 plumber` — and a card
+  update should not quietly start eating it.
+- **Tags live in the item's own text**, because Home Assistant's to-do items have four
+  fields — summary, status, due, description — and no notion of a tag. Keeping them in
+  the summary means they survive editing from the companion app or the core to-do card,
+  they are visible to anyone not using this card, and uninstalling it leaves
+  `Milk #dairy` rather than stray metadata.
+- **Tags can contain spaces**, in quotes after the hash: `Flour #"weekend baking"`.
+  Unquoted they would read back as several one-word tags.
+- **You need not type them in full.** Typing `#dai` narrows a suggestion row to what
+  matches; click one or press Tab and the word completes, keeping whatever followed it
+  on the line. Enter is deliberately untouched: it adds the item, and turning that into
+  "accept the completion" would be a nasty surprise halfway through a shopping list.
+  The `#` button beside the box lists every tag in use for browsing rather than typing,
+  and the same chips appear in an item's editor, lit for the tags it already carries.
+  Neither takes focus, so a phone keyboard stays open throughout.
 - **Every tag gets a colour, whether or not you chose one.** A tag's preferred colour
   comes from a hash of its name, so it is the same on every device and after every
   reload; where two tags want the same one, or a configured tag has taken it, the next
-  free colour is used instead. So a board of tags arrives looking varied without anyone
-  choosing anything.
-- **The editor lists every tag in play**, not just the ones already given a colour — a
-  tag invented while adding a task appears there to be recoloured, marked *auto* until
-  you pick something. It watches the lists, so a tag typed while the dialog is open turns
-  up without reopening it.
-- **The tag chips in an item's editor wear the tag's own colour** — filled when the tag
-  is on, faded when it is off — rather than the lane's accent, so the row shows what the
-  tags will actually look like.
-- **Editing an item shows on the item as you go.** Toggling a tag or typing a name is
-  reflected on the row straight away instead of only after saving, and cancelling puts
-  it back.
-- **Tags can contain spaces**, written in quotes after the hash: `Flour #"weekend
-  baking"`. Unquoted they would read back as several one-word tags.
+  free colour is used instead. Past twelve tags it reuses them rather than running out.
+- **The editor lists every tag in play**, not only those already given a colour — a tag
+  invented while adding a task appears there to be recoloured, marked *auto* until you
+  pick something. It watches the lists, so a tag typed while the dialog is open turns up
+  without reopening it.
+
+Two things that are not about tags:
+
+- **Editing an item shows on the item as you go.** Toggling a chip or typing a name is
+  reflected on the row straight away instead of only once saved, and cancelling puts it
+  back.
 - **The source is split into modules under `src/`,** and `npm run build` bundles them
   into the single file HACS installs. That file is still committed, still unminified and
   still readable — the single file is forced by HACS, which downloads exactly one — but
   it is no longer the thing you edit.
-- **Tags are off by default.** `enable_tags: true` switches them on, per card or per
-  lane. A `#` in an item may well be there for another reason, and a card update should
-  not quietly start eating it.
-- **Tags.** Write one into an item — `Milk #dairy` — and the card shows *Milk* with a
-  `dairy` chip beside it. Colour them with a `tags:` map; any tag you have not coloured
-  still shows, in a neutral chip, so tagging something never means visiting the editor
-  first. `hide_tags: true` turns the parsing off, on the card or one lane.
-
-  Tags live in the item's summary rather than a field of their own because Home
-  Assistant's to-do items do not have one — the fields are summary, status, due and
-  description, and nothing else. Keeping them in the summary means they survive editing
-  from the companion app or the core to-do card, they are visible to anyone not using
-  this card, and uninstalling it leaves `Milk #dairy` rather than stray metadata.
-- **Tags complete as you type.** `#dai` narrows the suggestions to what matches; click
-  one or press Tab for the first, and the word completes. Enter is deliberately left
-  alone — it adds the item, and turning that into "accept a completion" would be a nasty
-  surprise mid-list.
-- **Or pick one without typing.** The `#` button beside the add box lists every
-  tag already in use; clicking one drops it into what you are typing. The same chips are
-  in an item's editor, lit for the tags it already has, so one tap adds or removes a tag.
-  The card takes the list from the lanes it already subscribes to, so suggestions cost no
-  extra round trip. Neither the button nor the chips take focus, so a phone keyboard
-  stays open throughout.
-- **The visual editor suggests tags you have already used** when giving them colours. It
-  reads the configured lists and offers what it finds, while still accepting a tag that
-  does not exist yet.
 
 ## 1.2.1
 

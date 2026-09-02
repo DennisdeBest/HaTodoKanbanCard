@@ -20,10 +20,11 @@ const camel = (name) =>
   "mdi" + name.slice(4).split("-").map((p) => p[0].toUpperCase() + p.slice(1)).join("");
 
 const ICONS = [
-  // used by the card itself
+  // used by the card itself — keep in step with `grep -o 'mdi:[a-z-]*' src/*.js`
   "mdi:drag-horizontal-variant", "mdi:plus", "mdi:chevron-down", "mdi:chevron-up",
   "mdi:check", "mdi:delete-outline", "mdi:text", "mdi:alert-circle-outline",
-  "mdi:format-list-checks",
+  "mdi:format-list-checks", "mdi:pound", "mdi:backup-restore",
+  "mdi:arrow-up", "mdi:arrow-down",
   // used by the demo's example configs
   "mdi:alert-octagon", "mdi:cart", "mdi:calendar-clock", "mdi:tray-full",
   "mdi:progress-wrench", "mdi:check-decagram", "mdi:silverware-fork-knife",

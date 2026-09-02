@@ -32,7 +32,7 @@ a row — to another position, or to another lane:
 - **Fold a lane** by clicking its header. A lane with nothing left in it starts folded,
   which keeps a five-lane board readable.
 - **Tags**, written straight into the item: `Milk #dairy` shows as *Milk* with a `dairy`
-  chip. Colour them if you like; uncoloured tags still show.
+  chip. Every tag gets a colour, chosen for it or by it.
 - **Live**: one `todo/item/subscribe` per lane, so the board follows changes from the
   companion app, another tablet or an automation without a refresh.
 
@@ -150,6 +150,8 @@ editor first — what is there is for overriding what it picked.
 
 The editor lists **every tag in play**, including ones you have only ever typed into an
 item, each marked *auto* until you choose a colour for it.
+
+![Completing a tag while typing](https://raw.githubusercontent.com/DennisdeBest/HaTodoKanbanCard/master/docs/tags.png)
 
 **You do not have to type them in full, either.** Start typing `#dai` and the box
 suggests matching tags — click one, or press <kbd>Tab</kbd> for the first, and the word
@@ -341,10 +343,11 @@ looking fine.
 
 ## Not there yet
 
-- The visual editor covers the lists, their names, icons and colours, and the card-wide
-  options — but not the per-list overrides. Those stay in YAML.
+- The visual editor covers the lists, their names, icons and colours, the tag colours
+  and the card-wide options — but not the per-list overrides. Those stay in YAML.
 - No per-item due **time**, only dates.
-- No filtering or sorting; lanes show the list in its own order.
+- No filtering or grouping by tag. Tags are shown and edited, not yet used to narrow the
+  board down.
 - No horizontal autoscroll while dragging. Lanes wrap rather than overflow, so there is
   usually nothing to scroll sideways to.
 
