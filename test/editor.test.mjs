@@ -320,6 +320,52 @@ describe("tag colours in the editor", () => {
     assert.match(el.shadowRoot.textContent, /No tags yet/);
   });
 
+  /*
+   * Changing a colour does not change how many rows there are, so the editor takes its
+   * update-in-place path — which has to repaint the chip and swap the end of the row,
+   * or the only visible feedback is in the card preview off to the side.
+   */
+  test("the chip beside the picker repaints when a colour is chosen", async () => {
+    const { rowFor, el } = tagEditor(BASE);
+    await tick(40);
+    const before = rowFor("dairy").querySelector(".tag-preview").style.getPropertyValue("--tag-color");
+    rowFor("dairy").querySelector("ha-form").emit({ color: "pink" });
+    el.setConfig({ ...BASE, tags: { dairy: "pink" } });   // as Home Assistant echoes it back
+    await tick(10);
+    const after = rowFor("dairy").querySelector(".tag-preview").style.getPropertyValue("--tag-color");
+    assert.equal(after, "var(--pink-color)");
+    assert.notEqual(after, before);
+  });
+
+  test("and back again when it is reset", async () => {
+    const { rowFor, el } = tagEditor({ ...BASE, tags: { dairy: "pink" } });
+    await tick(40);
+    assert.equal(rowFor("dairy").querySelector(".tag-preview").style.getPropertyValue("--tag-color"),
+      "var(--pink-color)");
+    rowFor("dairy").querySelector(".tool").click();
+    el.setConfig(BASE);
+    await tick(10);
+    const after = rowFor("dairy").querySelector(".tag-preview").style.getPropertyValue("--tag-color");
+    assert.match(after, /^var\(--[a-z-]+-color\)$/);
+    assert.notEqual(after, "var(--pink-color)");
+  });
+
+  test("the row swaps between the auto marker and the reset button", async () => {
+    const { rowFor, el } = tagEditor(BASE);
+    await tick(40);
+    assert.ok(rowFor("dairy").querySelector(".auto-note"), "starts automatic");
+    assert.equal(rowFor("dairy").querySelector(".tool"), null);
+
+    el.setConfig({ ...BASE, tags: { dairy: "pink" } });
+    await tick(10);
+    assert.equal(rowFor("dairy").querySelector(".auto-note"), null, "no longer automatic");
+    assert.ok(rowFor("dairy").querySelector(".tool"), "and offers a reset");
+
+    el.setConfig(BASE);
+    await tick(10);
+    assert.ok(rowFor("dairy").querySelector(".auto-note"), "back to automatic");
+  });
+
   test("everything it emits is still a config the card accepts", async () => {
     const { rowFor, changes } = tagEditor({ ...BASE, tags: { dairy: "blue" } });
     await tick(40);

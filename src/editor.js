@@ -233,6 +233,14 @@ export class TodoKanbanCardEditor extends HTMLElement {
     this._emitTags(rows);
   }
 
+  // "auto" while the colour is the card's choice, a reset button once it is yours.
+  _tagRowEnd(row) {
+    return row.automatic
+      ? el("span", { class: "auto-note", title: "Chosen automatically", text: "auto" })
+      : this._button("mdi:backup-restore", "Back to the automatic colour",
+          () => this._resetTag(row.tag));
+  }
+
   // Back to the colour the card picks for it. The tag itself lives in the item text,
   // so there is nothing here to delete.
   _resetTag(tag) {
@@ -297,6 +305,16 @@ export class TodoKanbanCardEditor extends HTMLElement {
         form.hass = this._hass;
         form.data = { color: tagRows[i].color };
       });
+      // The chip beside each colour picker has to be repainted too — changing a colour
+      // or resetting one does not change how many rows there are, so this is the only
+      // path that runs, and the chip would otherwise keep the colour it was built with.
+      this._tagPreviews.forEach((preview, i) => {
+        preview.style.setProperty("--tag-color",
+          tagColor(tagRows[i].tag, this._config.tags || {}, this._known));
+        preview.classList.toggle("automatic", tagRows[i].automatic);
+      });
+      // ...and the end of the row swaps between the "auto" marker and the reset button.
+      this._tagEnds.forEach((end, i) => end.replaceChildren(this._tagRowEnd(tagRows[i])));
       if (this._tagsForm) {
         this._tagsForm.hass = this._hass;
         this._tagsForm.data = { enable_tags: !!this._config.enable_tags };
@@ -349,6 +367,8 @@ export class TodoKanbanCardEditor extends HTMLElement {
     root.appendChild(this._tagsForm);
 
     this._tagForms = [];
+    this._tagPreviews = [];
+    this._tagEnds = [];
     if (!tagRows.length) {
       root.appendChild(el("p", { class: "hint", text:
         "No tags yet. Write one into an item — \u201cMilk #dairy\u201d — and it will appear "
@@ -359,13 +379,14 @@ export class TodoKanbanCardEditor extends HTMLElement {
       this._tagForms.push(form);
       const preview = el("span", { class: "tag-preview", text: row.tag });
       preview.style.setProperty("--tag-color", tagColor(row.tag, this._config.tags || {}, this._known));
+      if (row.automatic) preview.classList.add("automatic");
+      this._tagPreviews.push(preview);
+      const end = el("span", { class: "tag-row-end" }, [this._tagRowEnd(row)]);
+      this._tagEnds.push(end);
       root.appendChild(el("div", { class: "lane-row tag-row" }, [
         preview,
         form,
-        row.automatic
-          ? el("span", { class: "auto-note", title: "Chosen automatically", text: "auto" })
-          : this._button("mdi:backup-restore", "Back to the automatic colour",
-              () => this._resetTag(row.tag)),
+        end,
       ]));
     });
 

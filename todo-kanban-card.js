@@ -1,4 +1,4 @@
-/* todo-kanban-card 1.3.0-beta.7 — https://github.com/DennisdeBest/HaTodoKanbanCard
+/* todo-kanban-card 1.3.0-beta.8 — https://github.com/DennisdeBest/HaTodoKanbanCard
  *
  * BUILT FILE — do not edit. The source is in src/; run `npm run build`.
  * MIT licensed. Bundled from src/ so that HACS, which installs exactly one file,
@@ -1065,7 +1065,7 @@ var TodoKanbanCard = class extends HTMLElement {
 };
 
 // src/editor-styles.css
-var editor_styles_default = "/* Styles for the visual editor. Bundled into the card at build time. */\n:host { display: flex; flex-direction: column; gap: 16px; }\n.section-title {\n  margin: 4px 0 -8px; font-size: 15px; font-weight: 500;\n  color: var(--primary-text-color);\n}\n.lane-row {\n  display: flex; align-items: flex-start; gap: 8px;\n  padding: 12px; border-radius: 12px;\n  border: 1px solid var(--divider-color); background: var(--card-background-color);\n}\n.lane-row ha-form { flex: 1; min-width: 0; }\n.lane-tools { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }\n.tool {\n  display: grid; place-items: center; width: 32px; height: 32px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: transparent; color: var(--secondary-text-color);\n}\n.tool:hover:not([disabled]) { background: rgba(127,127,127,.14); color: var(--primary-text-color); }\n.tool[disabled] { opacity: .35; cursor: default; }\n.tool ha-icon { --mdc-icon-size: 20px; }\n.add-row { padding: 0 12px; }\n.hint { margin: 0; color: var(--secondary-text-color); font-size: 12px; line-height: 1.5; }\n\n.tag-row { align-items: center; }\n.tag-row ha-form { flex: 1; }\n.tag-preview {\n  flex: 0 0 auto; max-width: 34%; padding: 2px 10px; border-radius: 10px;\n  font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  color: var(--tag-color, var(--secondary-text-color));\n  border: 1px solid currentColor;\n}\n.auto-note {\n  flex: none; width: 32px; text-align: center;\n  font-size: 11px; color: var(--secondary-text-color);\n}\n";
+var editor_styles_default = "/* Styles for the visual editor. Bundled into the card at build time. */\n:host { display: flex; flex-direction: column; gap: 16px; }\n.section-title {\n  margin: 4px 0 -8px; font-size: 15px; font-weight: 500;\n  color: var(--primary-text-color);\n}\n.lane-row {\n  display: flex; align-items: flex-start; gap: 8px;\n  padding: 12px; border-radius: 12px;\n  border: 1px solid var(--divider-color); background: var(--card-background-color);\n}\n.lane-row ha-form { flex: 1; min-width: 0; }\n.lane-tools { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }\n.tool {\n  display: grid; place-items: center; width: 32px; height: 32px;\n  border: none; border-radius: 8px; cursor: pointer;\n  background: transparent; color: var(--secondary-text-color);\n}\n.tool:hover:not([disabled]) { background: rgba(127,127,127,.14); color: var(--primary-text-color); }\n.tool[disabled] { opacity: .35; cursor: default; }\n.tool ha-icon { --mdc-icon-size: 20px; }\n.add-row { padding: 0 12px; }\n.hint { margin: 0; color: var(--secondary-text-color); font-size: 12px; line-height: 1.5; }\n\n.tag-row { align-items: center; }\n.tag-row ha-form { flex: 1; }\n.tag-preview {\n  flex: 0 0 auto; max-width: 34%; padding: 2px 10px; border-radius: 10px;\n  font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\n  color: var(--tag-color, var(--secondary-text-color));\n  border: 1px solid currentColor;\n}\n.auto-note {\n  flex: none; width: 32px; text-align: center;\n  font-size: 11px; color: var(--secondary-text-color);\n}\n.tag-row-end { flex: none; display: grid; place-items: center; min-width: 32px; }\n";
 
 // src/editor.js
 var EDITOR_LABELS = {
@@ -1274,6 +1274,14 @@ var TodoKanbanCardEditor = class extends HTMLElement {
     const rows = this._tagRows().map((row) => row.tag === tag ? { ...row, color: ev.detail.value.color || "" } : row);
     this._emitTags(rows);
   }
+  // "auto" while the colour is the card's choice, a reset button once it is yours.
+  _tagRowEnd(row) {
+    return row.automatic ? el("span", { class: "auto-note", title: "Chosen automatically", text: "auto" }) : this._button(
+      "mdi:backup-restore",
+      "Back to the automatic colour",
+      () => this._resetTag(row.tag)
+    );
+  }
   // Back to the colour the card picks for it. The tag itself lives in the item text,
   // so there is nothing here to delete.
   _resetTag(tag) {
@@ -1331,6 +1339,14 @@ var TodoKanbanCardEditor = class extends HTMLElement {
         form.hass = this._hass;
         form.data = { color: tagRows[i].color };
       });
+      this._tagPreviews.forEach((preview, i) => {
+        preview.style.setProperty(
+          "--tag-color",
+          tagColor(tagRows[i].tag, this._config.tags || {}, this._known)
+        );
+        preview.classList.toggle("automatic", tagRows[i].automatic);
+      });
+      this._tagEnds.forEach((end, i) => end.replaceChildren(this._tagRowEnd(tagRows[i])));
       if (this._tagsForm) {
         this._tagsForm.hass = this._hass;
         this._tagsForm.data = { enable_tags: !!this._config.enable_tags };
@@ -1378,6 +1394,8 @@ var TodoKanbanCardEditor = class extends HTMLElement {
     );
     root.appendChild(this._tagsForm);
     this._tagForms = [];
+    this._tagPreviews = [];
+    this._tagEnds = [];
     if (!tagRows.length) {
       root.appendChild(el("p", { class: "hint", text: "No tags yet. Write one into an item — “Milk #dairy” — and it will appear here to colour." }));
     }
@@ -1386,14 +1404,14 @@ var TodoKanbanCardEditor = class extends HTMLElement {
       this._tagForms.push(form);
       const preview = el("span", { class: "tag-preview", text: row.tag });
       preview.style.setProperty("--tag-color", tagColor(row.tag, this._config.tags || {}, this._known));
+      if (row.automatic) preview.classList.add("automatic");
+      this._tagPreviews.push(preview);
+      const end = el("span", { class: "tag-row-end" }, [this._tagRowEnd(row)]);
+      this._tagEnds.push(end);
       root.appendChild(el("div", { class: "lane-row tag-row" }, [
         preview,
         form,
-        row.automatic ? el("span", { class: "auto-note", title: "Chosen automatically", text: "auto" }) : this._button(
-          "mdi:backup-restore",
-          "Back to the automatic colour",
-          () => this._resetTag(row.tag)
-        )
+        end
       ]));
     });
     root.appendChild(el("p", { class: "hint", text: "Per-list overrides for folding, the add box and completed items are available in YAML, and are left alone by this editor." }));
@@ -1404,7 +1422,7 @@ var TodoKanbanCardEditor = class extends HTMLElement {
 };
 
 // src/version.js
-var VERSION = "1.3.0-beta.7";
+var VERSION = "1.3.0-beta.8";
 
 // src/index.js
 if (!customElements.get("todo-kanban-card-editor")) {
