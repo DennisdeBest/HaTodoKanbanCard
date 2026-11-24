@@ -77,7 +77,11 @@ export class TodoKanbanCard extends HTMLElement {
     if (collapse !== undefined && !["auto", true, false].includes(collapse)) {
       throw new Error("todo-kanban-card: `default_collapsed` must be auto, true or false");
     }
+    const prevLanes = this._config ? this._config.lanes.map((l) => l.entity).join("|") : null;
     this._config = { ...DEFAULTS, ...config, lanes };
+    if (this._hass && prevLanes !== null && prevLanes !== lanes.map((l) => l.entity).join("|")) {
+      this._subscribe();
+    }
     this._render();
   }
 
